@@ -1,0 +1,533 @@
+/* --- Google Font Import (Example: Roboto for a clean, technical look) --- */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kalam&display=swap');
+/* For Handwriting Option */
+
+/* --- Basic Reset & Body --- */
+body {
+    font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
+    /* Default to a clean sans-serif */
+    font-size: 14px;
+    /* Blender tends to use slightly smaller base fonts */
+    margin: 0;
+    background-color: #000000;
+    /* Very dark gray, not pure black for base */
+    color: #b0b0b0;
+    /* Lighter gray for default text, less stark than pure white */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    /* Prevent text selection on most elements */
+}
+
+/* Specific font family classes that JS will toggle on the <body> */
+body.font-normal {
+    /* Roboto or your default */
+    font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
+}
+
+body.font-monospace {
+    font-family: 'Consolas', 'Menlo', 'Courier New', Courier, monospace;
+    /* Better monospace stack */
+}
+
+body.font-handwriting {
+    font-family: 'Kalam', 'Comic Sans MS', cursive;
+    /* Kalam from Google Fonts */
+}
+
+
+.hidden {
+    display: none !important;
+}
+
+/* --- Main Game Interface --- */
+#game-interface {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100%;
+    background-color: #000000;
+    /* Base panel color, slightly lighter than body */
+}
+
+#main-header {
+    background-color: #000000;
+    padding: 0;
+    /* Remove padding here, control spacing with tab bar itself */
+    display: flex;
+    align-items: center;
+    border-bottom: 0px;
+    flex-shrink: 0;
+    height: 40px;
+    /* Keep defined height */
+    box-sizing: border-box;
+}
+
+#logo-title {
+    padding: 0 15px;
+    font-weight: 500;
+    /* Medium weight */
+    font-size: 1.1em;
+    /* Slightly larger */
+    color: #dfdfdf;
+    /* Brighter for logo/title */
+    line-height: 37px;
+    /* Align with header height */
+}
+
+#global-tab-bar {
+    display: flex;
+    height: 100%;
+    margin-left: 10px;
+    /* Space between logo and first tab */
+    /* Add a subtle top margin/border to make the bar look like a distinct strip */
+    /* border-top: 1px solid #2a2a2a; /* Example: very subtle lighter top line */
+    /* margin-top: 2px; /* Example: small space above tabs */
+}
+
+.tab-button {
+    background-color: #050505;
+    /* Slightly different base for non-active tabs */
+    border: none;
+    /* Remove individual L/R borders for a more continuous look if spacing is added */
+    /* border-right: 1px solid #111111; */
+    padding: 0 18px;
+    cursor: pointer;
+    color: #999999;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: background-color 0.15s, color 0.15s, border-radius 0.1s ease-out;
+    /* Add border-radius transition */
+    outline: none;
+    position: relative;
+    line-height: 38px;
+    /* Match header height for vertical centering */
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 5px;
+    /* Spacing BETWEEN tabs */
+    margin-top: 10px;
+    /* Spacing BETWEEN tabs */
+    border-top-left-radius: 10px;
+    /* Apply to ALL tabs for a consistent shape */
+    border-top-right-radius: 10px;
+    /* Apply to ALL tabs */
+    border-bottom-left-radius: 0;
+    /* Sharp bottom for non-active */
+    border-bottom-right-radius: 0;
+    /* Sharp bottom for non-active */
+}
+
+.tab-button:hover {
+    background-color: #2E2E2E;
+    color: #cccccc;
+}
+
+.tab-button.active {
+    background-color: #111111;
+    /* Match main-content-area background */
+    color: #ffffff;
+    font-weight: 700;
+    /* Bolder for active */
+    /* Curved top corners are already applied to all tabs */
+    border-bottom: 0px;
+    /* Bottom border matches background, making it disappear */
+    /* Optional: slightly raise the active tab or give it a different top border */
+    /* position: relative; */
+    /* top: -1px; */
+    /* Example: slight raise */
+    /* border-top: 1px solid #444; */
+    z-index: 1;
+    /* Ensure active tab is above others if overlapping effects are used */
+}
+
+.tab-close-button {
+    margin-left: 10px;
+    font-weight: normal;
+    /* Lighter weight for 'x' */
+    color: #777;
+    padding: 0px 6px;
+    border-radius: 3px;
+    /* Slightly rounded close button */
+    line-height: 1.1;
+    font-size: 1.1em;
+    display: inline-block;
+    vertical-align: middle;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.tab-close-button:hover {
+    background-color: #555;
+    color: #fff;
+}
+
+
+#main-content-area {
+    flex-grow: 1;
+    background-color: #111111;
+    /* Main working area background, slightly lighter than panels */
+    padding: 15px;
+    /* Reduced padding for a tighter feel */
+    overflow-y: auto;
+    position: relative;
+    border-top: 1px solid #000000;
+    /* Separator from tabs */
+}
+
+.tab-panel {
+    display: none;
+    height: 100%;
+    box-sizing: border-box;
+    animation: panelFadeIn 0.2s ease-out;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+@keyframes panelFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* --- Footer Input Area --- */
+#input-area {
+    background-color: #1c1c1c;
+    /* Match header dark strip */
+    padding: 8px 10px;
+    /* Tighter padding */
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #000000;
+    flex-shrink: 0;
+    height: 42px;
+    /* Defined height */
+    box-sizing: border-box;
+}
+
+#player-command-input {
+    flex-grow: 1;
+    padding: 8px 12px;
+    /* Adjusted padding */
+    border: 1px solid #000000;
+    /* Black border */
+    background-color: #151515;
+    /* Very dark input background */
+    color: #cccccc;
+    border-radius: 4px;
+    /* Slightly curved edges */
+    margin-right: 8px;
+    outline: none;
+    font-size: 0.95em;
+    /* Inner shadow for depth */
+}
+
+#player-command-input:focus {
+    border-color: #4a7ac1;
+}
+
+#submit-command-btn {
+    background-color: #000000;
+    /* Subtle gradient */
+    color: #cccccc;
+    border: 1px solid #000000;
+    padding: 0 20px;
+    /* More horizontal padding for button shape */
+    height: 30px;
+    /* Match input field height better */
+    line-height: 28px;
+    /* Align text */
+    border-radius: 4px;
+    /* Curved edges */
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9em;
+    transition: background-image 0.15s;
+}
+
+#submit-command-btn:hover {
+    background-image: linear-gradient(to bottom, #4f4f4f, #383838);
+}
+
+#submit-command-btn:active {
+    background-color: #000000;
+}
+
+/* --- General Content Styles (within .tab-panel) --- */
+.tab-panel h2 {
+    color: #e0e0e0;
+    font-size: 1.5em;
+    font-weight: 500;
+    margin-top: 5px;
+    /* Less top margin */
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #1a1a1a;
+    /* Darker separator */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.tab-panel h3 {
+    color: #c7c7c7;
+    font-size: 1.1em;
+    font-weight: 500;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #202020;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tab-panel p {
+    line-height: 1.6;
+    margin-bottom: 15px;
+    color: #a0a0a0;
+    /* Slightly dimmer paragraph text */
+}
+
+/* --- Styles for Data Management Panel Content --- */
+/* .data-management-panel h2 already covered by general .tab-panel h2 */
+
+.data-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    /* Tighter padding */
+    background-color: #000000;
+    /* Darker section background */
+    border: 1px solid #000000;
+    /* Black border for sections */
+    border-radius: 3px;
+    /* Minimal rounding */
+}
+
+/* .data-section h3 already covered */
+
+.api-key-status {
+    font-style: normal;
+    /* No italics */
+    color: #888888;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+}
+
+.data-section label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    /* Medium weight */
+    color: #b0b0b0;
+    font-size: 0.9em;
+}
+
+.data-section input[type="password"],
+.data-section input[type="text"] {
+    width: calc(100% - 22px);
+    padding: 9px 10px;
+    /* Slightly smaller padding */
+    margin-bottom: 12px;
+    border: 1px solid #000000;
+    background-color: #000000;
+    color: #cccccc;
+    border-radius: 3px;
+    /* Consistent minimal rounding */
+    outline: none;
+}
+
+.data-section input[type="password"]:focus,
+.data-section input[type="text"]:focus {
+    border-color: #4a7ac1;
+}
+
+.data-section button {
+    /* Re-style buttons inside data sections like the submit button */
+    background-color: #111;
+    color: #c0c0c0;
+    border: 1px solid #000000;
+    padding: 0 15px;
+    height: 28px;
+    line-height: 26px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-right: 8px;
+    margin-top: 5px;
+    font-weight: 500;
+    font-size: 0.85em;
+    transition: background-image 0.15s;
+}
+
+.data-section button:hover {
+    background-image: linear-gradient(to bottom, #4c4c4c, #363636);
+    color: #dfdfdf;
+}
+
+.data-section button:active {
+    background-color: #000000;
+}
+
+/* --- Font Selector (within .data-section) --- */
+.font-selector-section {
+    /* No extra margin needed if inside .data-section with padding */
+}
+
+.font-selector-section select {
+    padding: 8px 10px;
+    border: 1px solid #000000;
+    background-color: #151515;
+    color: #cccccc;
+    border-radius: 3px;
+    min-width: 220px;
+    font-size: 0.9em;
+    outline: none;
+}
+
+.font-selector-section select:focus {
+    border-color: #4a7ac1;
+}
+
+
+/* --- Home Panel Specifics --- */
+.home-panel-content {
+    /* General .tab-panel styles apply */
+    text-align: left;
+    /* Align text left, not center */
+}
+
+/* .home-panel-content h2, p already covered by general tab-panel styles */
+
+.status-section {
+    /* Already styled as .data-section, good reuse */
+    background-color: #242424;
+    border: 1px solid #000000;
+}
+
+.status-item {
+    margin-bottom: 10px;
+    /* Increased spacing between items for clarity */
+    display: flex;
+    /* Use flexbox for alignment */
+    align-items: flex-start;
+    /* Align items to the start of the cross axis (top for row flex) */
+    /* Use `align-items: center;` if you prefer vertical centering of label and value */
+    font-size: 0.95em;
+    /* Slightly larger for better readability */
+}
+
+.status-item strong {
+    color: #b0b0b0;
+    font-weight: 500;
+    min-width: 130px;
+    /* Give labels a minimum width to align values */
+    /* Adjust this min-width as needed based on your longest label */
+    display: inline-block;
+    /* Allows min-width to take effect properly */
+    margin-right: 10px;
+    /* Space between label and value */
+}
+
+.status-item>span,
+.status-item>div.player-progress-details {
+    /* Target the new wrapper for progress */
+    flex-grow: 1;
+    /* Allow the value part to take up remaining space if needed */
+    color: #a0a0a0;
+    /* Value color */
+}
+
+.player-progress-details p {
+    margin: 0 0 5px 0;
+    /* Tighter margins for paragraphs within progress details */
+    padding: 0;
+    line-height: 1.4;
+}
+
+.player-progress-details p:last-child {
+    margin-bottom: 0;
+}
+
+
+/* --- Content List (Example for notes, patients) --- */
+.content-list {
+    list-style: none;
+    padding: 0;
+}
+
+.content-list li {
+    background-color: #262626;
+    /* Slightly darker list items */
+    padding: 10px 12px;
+    margin-bottom: 5px;
+    /* Tighter spacing */
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid #1a1a1a;
+    border-left: 3px solid #262626;
+    /* Start with no accent */
+    transition: background-color 0.15s, border-left-color 0.15s;
+    font-size: 0.95em;
+    color: #a0a0a0;
+}
+
+.content-list li:hover {
+    background-color: #303030;
+    border-left-color: #5a8ed6;
+    /* Accent on hover */
+    color: #c0c0c0;
+}
+
+/* --- Scenario Play Screen Placeholder --- */
+.scenario-playscreen {
+    padding: 0;
+    /* Panel padding is enough */
+    border: none;
+    /* Remove dashed border */
+}
+
+.scenario-playscreen h3 {
+    /* Consistent with other H3s */
+    color: #c7c7c7;
+    font-size: 1.1em;
+    font-weight: 500;
+    margin-top: 5px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #202020;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* --- Notes Textarea --- */
+.notes-panel textarea {
+    /* Assuming notes content is in a panel with this class or similar target */
+    width: calc(100% - 20px);
+    /* Account for padding */
+    height: calc(100% - 70px);
+    /* Adjust based on h2 height and some margin */
+    min-height: 300px;
+    background-color: #131313;
+    /* Very dark for text editing */
+    color: #b0b0b0;
+    border: 1px solid #000000;
+    padding: 10px;
+    border-radius: 3px;
+    resize: vertical;
+    /* Allow vertical resize */
+    font-family: inherit;
+    /* Inherit chosen body font */
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.notes-panel textarea:focus {
+    border-color: #4a7ac1;
+    outline: none;
+}

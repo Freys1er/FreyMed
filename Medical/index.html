@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frey Medical Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- If using Google Fonts or other external CSS, include it here -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kalam&display=swap" rel="stylesheet"> <!-- Example Handwriting Font -->
+</head>
+<body>
+
+    <!-- Main Game Interface -->
+    <div id="game-interface">
+        <header id="main-header">
+            <nav id="global-tab-bar">
+                <!-- Global tabs will be dynamically inserted here by JS -->
+            </nav>
+        </header>
+
+        <main id="main-content-area">
+            <!-- Content for the active global tab will be rendered here by JS -->
+        </main>
+
+        <footer id="input-area" class="hidden"> <!-- Start with input area hidden -->
+            <input type="text" id="player-command-input" placeholder="Enter action or command...">
+            <button id="submit-command-btn">Submit</button>
+        </footer>
+    </div>
+
+    <!-- SCRIPT LOAD ORDER IS CRITICAL -->
+    <script src="js/storage.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/gemini.js"></script> <!-- Assuming gemini.js might also define a global 'gemini' object or functions -->
+    <script src="js/main.js"></script>
+
+</body>
+</html>
