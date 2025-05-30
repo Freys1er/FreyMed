@@ -1,4 +1,4 @@
-// js/ui.js
+// js/ui.js (Modified to include getPatientTabContent)
 
 const ui = {
     FONT_CLASSES: ['font-normal', 'font-monospace', 'font-handwriting'],
@@ -75,8 +75,7 @@ const ui = {
             <hr>
             <div class="data-section">
                 <h3>Display Font</h3>
-                <!-- Font selector will be appended here -->
-            </div>
+                </div>
             <hr>
             <div class="data-section">
                 <h3>Import / Export User Data</h3>
@@ -175,6 +174,7 @@ const ui = {
             panel.innerHTML = '';
             panel.appendChild(contentData);
         } else if (typeof contentData === 'object' && contentData !== null) {
+            // This is a fallback, actual content for complex tabs should be HTML or HTMLElement
             panel.innerHTML = `<h2>Content for ${tabId}</h2><pre>${JSON.stringify(contentData, null, 2)}</pre>`;
         } else {
             panel.innerHTML = `<h2>Content for ${tabId}</h2><p>No specific content provided, or content is undefined.</p>`;
@@ -188,6 +188,39 @@ const ui = {
         const panel = contentArea.querySelector(`.tab-panel[data-tab-id="${tabId}"]`);
         if (panel) {
             panel.remove();
+        }
+    },
+
+    // Function to append content to the main content area of the *active scenario tab*
+    // This assumes the active tab's content panel has a child with class 'scenario-output'
+    appendToMainContent: function(text, isPlayerCommand = false) {
+        const activeTabId = window.appShell.getActiveTabId(); // Get active tab ID from appShell
+        // Target the specific scenario output div
+        const scenarioOutputDiv = document.getElementById(`scenario-output-${activeTabId}`);
+
+        if (scenarioOutputDiv) {
+            const p = document.createElement('p');
+            p.innerHTML = text.replace(/\n/g, '<br>'); // Replace newlines for display
+            if (isPlayerCommand) {
+                p.classList.add('player-command');
+            } else {
+                p.classList.add('ai-response');
+            }
+            scenarioOutputDiv.appendChild(p);
+            scenarioOutputDiv.scrollTop = scenarioOutputDiv.scrollHeight; // Auto-scroll to bottom
+        } else {
+            console.warn(`Could not find scenario output div for active tab: ${activeTabId}. Appending to console.`);
+            // Fallback for cases where output div isn't found or active tab isn't a scenario
+            const contentArea = this.getMainContentArea();
+            if (contentArea) {
+                const p = document.createElement('p');
+                p.textContent = text;
+                p.style.fontStyle = 'italic';
+                p.style.color = '#ccc';
+                if (isPlayerCommand) p.style.color = '#fff';
+                contentArea.appendChild(p);
+                contentArea.scrollTop = contentArea.scrollHeight;
+            }
         }
     }
 };
