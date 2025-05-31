@@ -304,5 +304,58 @@ const ui = {
         } else {
             console.warn(`UI Warn: Scenario output div '${outputDivId}' not found for logging in tab '${scenarioTabId}'.`);
         }
+    },
+
+    _footerTimerDisplay: null,
+
+    getFooterTimerDisplay: function () {
+        if (!this._footerTimerDisplay) {
+            this._footerTimerDisplay = document.getElementById('global-scenario-timer-display');
+        }
+        return this._footerTimerDisplay;
+    },
+
+    /**
+     * Updates the global timer display in the footer.
+     * @param {number | null} totalSeconds - Total elapsed seconds for the active scenario, or null to hide/reset.
+     * @param {boolean} [isPaused=false] - If the timer is paused.
+     */
+    // js/ui.js
+    updateFooterTimerDisplay: function (totalSeconds, isPaused = false) {
+        const timerElement = this.getFooterTimerDisplay();
+        if (timerElement) {
+            if (totalSeconds !== null && totalSeconds >= 0) {
+                const timeString = this.formatTimeForDisplay(totalSeconds);
+                timerElement.textContent = timeString + (isPaused ? " (P)" : "");
+                timerElement.style.display = 'block'; // Ensure it's block if it was none
+            } else {
+                timerElement.textContent = "00:00";
+                // timerElement.style.display = 'none'; // Keep it visible for now with default text for debugging
+                timerElement.style.display = 'block'; // Keep visible
+                timerElement.style.color = 'gray'; // Indicate inactive
+            }
+        } else {
+            console.warn("UI WARN: Footer timer element not found in updateFooterTimerDisplay.");
+        }
+    },
+
+    // updateScenarioTimerDisplay (for in-tab timer) remains the same
+    updateScenarioTimerDisplay: function (scenarioTabId, totalSeconds, isPaused = false) {
+        const timerDisplayId = `scenario-timer-${scenarioTabId}`;
+        const timerElement = document.getElementById(timerDisplayId);
+        if (timerElement) {
+            const timeString = ui.formatTimeForDisplay(totalSeconds);
+            timerElement.textContent = timeString + (isPaused ? " (Paused)" : "");
+        }
+    },
+
+    formatTimeForDisplay: function (totalSeconds) {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        let timeString = "";
+        if (hours > 0) timeString += `${String(hours).padStart(2, '0')}:`;
+        timeString += `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        return timeString;
     }
 };

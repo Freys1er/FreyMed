@@ -8,13 +8,15 @@ button, .button-like { /* Apply .button-like to <a> tags for consistent styling 
     padding: 0 15px; /* Default padding */
     height: 28px; /* Default height */
     line-height: 26px; /* text-align fix */
-    border-radius: 1000px; /* Standard curved edges */
+    border-radius: 0px; /* Standard curved edges */
     cursor: pointer;
     font-weight: 500;
     font-size: 0.9em;
     transition: all 0.15s ease-out;
     text-align: center;
     user-select: none;
+    
+    border-radius: 1000px; /* Standard curved edges */
 }
 button:hover, .button-like:hover {
     background-color: #222222;
@@ -69,7 +71,7 @@ textarea {
 #player-command-input { /* Already specific in layout, but can refine here */
     background-color: #0a0a0a; /* Darker than general inputs potentially */
     font-size: 1em; /* Slightly larger for command input */
-    width: 95%; /* Wider input field */
+    width: 100%; /* Full width */
 }
 #submit-command-btn { /* Uses general button styles, can be more specific if needed */
     height: 36px; /* Match input field visual height better */

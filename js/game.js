@@ -4,7 +4,7 @@ const game = {
     getHomePageContent: function (playerData, isApiKeySet, onStartNewGameClick, getRecentlyClosedScenarios, onReopenClosedScenarioClick /*, onContinueGameClick */) {
         const panel = document.createElement('div');
         panel.classList.add('home-panel-content');
-        let welcomeMessage = "Welcome to Critical Choices: A Medical Simulator!";
+        let welcomeMessage = "Welcome to Frey Medical: A Medical Simulator!";
         let statsSummary = "<p>No game data found. Start a new scenario!</p>";
         if (playerData && playerData.stats) {
             statsSummary = `
@@ -35,6 +35,7 @@ const game = {
         panel.innerHTML = `
             <h2>${welcomeMessage}</h2>
             <p>Hone your medical decision-making skills in realistic scenarios.</p>
+
             <div class="data-section">
                 <h3>Current Status</h3>
                 <div class="status-item">
@@ -46,10 +47,23 @@ const game = {
                     <div class="player-progress-details">${statsSummary}</div>
                 </div>
             </div>
-            <div class="data-section"> <!-- New section for start button -->
-                <p>${isApiKeySet ? "You're ready to play!" : "Configure API Key in 'Data & Settings' to enable AI scenarios."}</p>
-                <button id="home-start-new-game" class="data-section-button">Start New Scenario</button>
+
+            <div class="data-section" id="new-scenario-setup">
+                <h3>Start New Scenario</h3>
+                <p>${isApiKeySet ? "Describe the scenario or your role:" : "Configure API Key in 'Data & Settings' to enable AI scenarios."}</p>
+
+                <div class="form-group">
+                    <p class="form-label" id="scenario-profession-label">Your Profession/Role (e.g., ER Doctor, Paramedic, Surgeon):</p>
+                    <input type="text" id="scenario-profession" class="home-input" placeholder="ER Doctor" aria-labelledby="scenario-profession-label">
+                </div>
+                <div class="form-group">
+                    <p class="form-label" id="scenario-details-label">Scenario Details / Patient Chief Complaint (optional):</p>
+                    <textarea id="scenario-details" class="home-textarea" placeholder="e.g., 45yo male with chest pain, or 'Motor vehicle accident'" aria-labelledby="scenario-details-label"></textarea>
+                </div>
+
+                <button id="home-start-new-game" class="data-section-button">Generate Scenario</button>
             </div>
+
             <hr>
             <div class="data-section">
                 <h3>Recently Closed Scenarios</h3>
@@ -58,15 +72,23 @@ const game = {
         `;
 
         const startBtn = panel.querySelector('#home-start-new-game');
+        const professionInput = panel.querySelector('#scenario-profession');
+        const detailsInput = panel.querySelector('#scenario-details');
         if (startBtn) {
             if (!isApiKeySet) {
                 startBtn.disabled = true;
                 startBtn.textContent = "API Key Needed";
                 startBtn.style.backgroundColor = '#444';
                 startBtn.style.cursor = 'not-allowed';
+
+                professionInput.disabled = true;
+                detailsInput.disabled = true;
             } else {
                 startBtn.addEventListener('click', () => {
-                    onStartNewGameClick(); // Call with NO arguments for a new game
+                    const profession = professionInput.value.trim();
+                    const details = detailsInput.value.trim();
+                    // Pass these values to the handler in main.js
+                    onStartNewGameClick({ profession, details }); // Pass as an object
                 });
             }
         }

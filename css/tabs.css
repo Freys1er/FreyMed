@@ -94,8 +94,8 @@
     font-weight: normal;
     color: #666;
     /* Dimmer close button */
-    padding: 0px 6px;
-    border-radius: 50%;
+    padding: 0px 7px 0px 7px;
+    border-radius: 10%;
     /* More circular */
     line-height: 1;
     font-size: 1.2em;

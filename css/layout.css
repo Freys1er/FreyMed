@@ -56,6 +56,20 @@
     box-sizing: border-box;
 }
 
+.footer-timer {
+    font-size: 1.5em; /* Make it noticeable */
+    font-weight: bold;
+    color: #FF0000; /* Tomato red for stress, or your accent color */
+    margin: 15px 15px 15px 0px; /* Space before the input field */
+    padding: 0px 15px 0px 15px;
+    background-color: #101010; /* Slightly different background */
+    border-radius: 1000px;
+    border: 1px solid #000000;
+    min-width: 70px; /* Ensure it has some width even at 00:00 */
+    text-align: center;
+    font-family: 'Courier New', Courier, monospace; /* Monospace for timer look */
+}
+
 /* General panel class that might be used by tab-panel content */
 .panel-content-wrapper { /* You might wrap tab panel content in this for consistent padding */
     padding: 15px;

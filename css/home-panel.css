@@ -1,11 +1,13 @@
 /* css/home-panel.css */
 
-.home-panel-content { /* Wrapper div created by game.js for home content */
+.home-panel-content {
+    /* Wrapper div created by game.js for home content */
     /* Padding applied by #main-content-area or .panel-content-wrapper */
     text-align: left;
 }
 
-.home-panel-content h2 { /* Overrides general .tab-panel h2 if needed */
+.home-panel-content h2 {
+    /* Overrides general .tab-panel h2 if needed */
     font-size: 1.6em;
     margin-bottom: 25px;
 }
@@ -14,46 +16,60 @@
 /* No new styles needed if .data-section from data-panel.css is sufficient */
 /* However, if you want unique styling for status items on home: */
 
-.status-item { /* From previous CSS, ensure it's here if not in components.css */
+.status-item {
+    /* From previous CSS, ensure it's here if not in components.css */
     margin-bottom: 12px;
     display: flex;
-    align-items: flex-start; /* Or center */
-    font-size: 0.9em; /* Slightly smaller status items */
+    align-items: flex-start;
+    /* Or center */
+    font-size: 0.9em;
+    /* Slightly smaller status items */
 }
+
 .status-item strong {
     /* color from theme.css */
-    min-width: 140px; /* Adjust for longest label on home page */
+    min-width: 140px;
+    /* Adjust for longest label on home page */
     display: inline-block;
     margin-right: 10px;
 }
-.status-item > span,
-.status-item > div.player-progress-details {
+
+.status-item>span,
+.status-item>div.player-progress-details {
     flex-grow: 1;
     /* color from theme.css */
 }
+
 .player-progress-details p {
     margin: 0 0 4px 0;
     padding: 0;
     line-height: 1.4;
     font-size: 0.95em;
 }
+
 .player-progress-details p:last-child {
     margin-bottom: 0;
 }
 
-.home-panel-content .status-actions { /* Container for action buttons on home */
+.home-panel-content .status-actions {
+    /* Container for action buttons on home */
     margin-top: 25px;
     padding-top: 15px;
-    border-top: 1px solid #1a1a1a; /* Separator */
+    border-top: 1px solid #1a1a1a;
+    /* Separator */
+    border-radius: 1000px; /* Standard curved edges */
 }
+
 .home-panel-content .status-actions button {
     /* Uses general button styles from components.css */
-    padding: 0 20px; /* Make primary action buttons wider */
+    padding: 0 20px;
+    /* Make primary action buttons wider */
     height: 34px;
     line-height: 32px;
     font-size: 0.95em;
     margin-right: 10px;
 }
+
 .home-panel-content .status-actions button:last-child {
     margin-right: 0;
 }
@@ -62,12 +78,76 @@
 .closed-scenarios-list {
     margin-top: 10px;
 }
+
 .closed-scenarios-list li {
     /* Uses general .content-list li styles */
-    display: flex; /* For aligning text and button */
+    display: flex;
+    /* For aligning text and button */
     justify-content: space-between;
     align-items: center;
+    border-radius: 10px; /* Standard curved edges */
 }
-.closed-scenarios-list li .reopen-scenario-btn { /* Specific button in this list */
+
+.closed-scenarios-list li .reopen-scenario-btn {
+    /* Specific button in this list */
     /* Uses general button styles, possibly smaller overrides from .content-list li button */
+}
+
+/* Add to css/home-panel.css or components.css */
+/* css/home-panel.css OR components.css */
+/* css/home-panel.css OR components.css */
+
+#new-scenario-setup .form-group {
+    margin-bottom: 15px;
+}
+
+/* Style for the <p> elements now acting as labels */
+#new-scenario-setup .form-label {
+    /* display: block; /* <p> is already block, so this isn't strictly needed but doesn't hurt */
+    margin-bottom: 5px;
+    /* Space between the label and the input below it */
+    font-weight: 500;
+    color: #b0b0b0;
+    /* Or your theme's label color */
+    font-size: 0.9em;
+    /* Remove any default paragraph margins if they are too large */
+    margin-top: 0;
+    padding: 0;
+}
+
+#new-scenario-setup .home-input,
+#new-scenario-setup .home-textarea {
+    width: 100%;
+    /* Make input/textarea take full width of .form-group */
+    box-sizing: border-box;
+    /* Include padding/border in the 100% width */
+    /* ... other existing input/textarea styles from your components.css or theme.css ... */
+    /* Ensure these styles are present or inherited: */
+    padding: 9px 10px;
+    border: 1px solid #000000;
+    background-color: #0a0a0a;
+    color: #b0b0b0;
+    border-radius: 4px;
+    outline: none;
+    font-size: 0.95em;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#new-scenario-setup .home-input:focus,
+#new-scenario-setup .home-textarea:focus {
+    border-color: #4a7ac1;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 2px rgba(74, 122, 193, 0.2);
+}
+
+#new-scenario-setup .home-textarea {
+    min-height: 80px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+/* Button styling should already be in place */
+#new-scenario-setup #home-start-new-game {
+    margin-top: 10px;
+    border-radius: 1000px; /* Standard curved edges */
 }
