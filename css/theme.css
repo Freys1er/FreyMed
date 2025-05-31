@@ -1,0 +1,76 @@
+/* css/theme.css */
+
+/* --- Blender-Inspired Dark Theme --- */
+body {
+    background-color: #000000; /* Pure black as requested for outer body */
+    color: #b0b0b0; /* Default light gray text */
+}
+
+/* General panel and container backgrounds */
+#game-interface {
+    background-color: #000000; /* Main wrapper also black */
+}
+
+#main-header {
+    background-color: #000000; /* Header strip, pure black */
+    border-bottom: 1px solid #181818; /* Slightly lighter border for definition */
+}
+
+#main-content-area {
+    background-color: #000000; /* Pure black for main content */
+    /* border-top: 1px solid #181818; */ /* Defined by header bottom border */
+}
+
+#input-area {
+    background-color: #000000; /* Footer strip, pure black */
+    border-top: 1px solid #181818;
+}
+
+/* Text Colors */
+h1, h2, h3, .logo-title-text { /* Assuming you might add a class for the logo text */
+    color: #e0e0e0; /* Brighter for titles */
+}
+
+p, li, span, label { /* General paragraph/list text */
+    color: #a0a0a0;
+}
+
+strong {
+    color: #b8b8b8; /* Slightly brighter for emphasized text */
+}
+
+/* Links */
+a {
+    color: #5a8ed6; /* Accent blue for links */
+}
+a:hover {
+    color: #7cb5f9; /* Lighter blue on hover */
+}
+
+/* Separators / Borders */
+hr {
+    border: 0;
+    border-top: 1px solid #202020; /* Dark gray for HRs */
+    margin: 20px 0;
+}
+
+/* Scrollbar Styling (for Webkit browsers - very subtle) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #101010; /* Very dark track */
+}
+::-webkit-scrollbar-thumb {
+    background: #333333; /* Dark gray thumb */
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #454545; /* Slightly lighter on hover */
+}
+/* For Firefox (less control, but basic theming) */
+* {
+  scrollbar-color: #333333 #101010; /* thumb track */
+  scrollbar-width: thin;
+}

@@ -4,44 +4,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Frey Medical Simulator</title>
-    <link rel="stylesheet" href="css/style.css">
-    <!-- If using Google Fonts or other external CSS, include it here -->
+    <title>Frey Medical Simulator</title> <!-- Changed from Critical Choices -->
+
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kalam&display=swap" rel="stylesheet">
-    <!-- Example Handwriting Font -->
+
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/theme.css"> <!-- Theme for colors early -->
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/tabs.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/home-panel.css">
+    <link rel="stylesheet" href="css/data-panel.css">
+    <link rel="stylesheet" href="css/notes-panel.css">
+    <link rel="stylesheet" href="css/scenario-panel.css">
+
 </head>
 
 <body>
-    <!-- Main Game Interface -->
+    <!-- Main Game Interface (structure remains the same) -->
     <div id="game-interface">
         <header id="main-header">
-            <nav id="global-tab-bar">
-                <!-- Global tabs will be dynamically inserted here by JS -->
-            </nav>
+            <nav id="global-tab-bar"></nav>
         </header>
-
-        <main id="main-content-area">
-            <!-- Content for the active global tab will be rendered here by JS -->
-        </main>
-
-        <footer id="input-area" class="hidden"> <!-- Start with input area hidden -->
+        <main id="main-content-area"></main>
+        <footer id="input-area" class="hidden">
             <input type="text" id="player-command-input" placeholder="Enter action">
             <button id="submit-command-btn">Submit</button>
         </footer>
     </div>
 
-    <!-- SCRIPT LOAD ORDER IS CRITICAL -->
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/gemini.min.js"></script>
+    <!-- In index.html -->
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/gemini.min.js"
+        onload="sdkLoaded()"></script>
 
+    <!-- Your other scripts -->
     <script src="js/storage.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/game.js"></script>
     <script src="js/gemini.js"></script>
-    <!-- Assuming gemini.js might also define a global 'gemini' object or functions -->
     <script src="js/main.js"></script>
-
+    <script src="js/preventBodyScroll.js"></script>
 </body>
 
 </html>

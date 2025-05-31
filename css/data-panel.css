@@ -1,0 +1,25 @@
+/* css/notes-panel.css */
+
+.notes-panel { /* Wrapper div created by game.js for notes content */
+    display: flex; /* Allow textarea to grow */
+    flex-direction: column;
+    height: 100%;
+    /* Padding applied by #main-content-area or .panel-content-wrapper */
+}
+
+/* .notes-panel h2 already covered by general .tab-panel h2 in theme.css */
+
+.notes-panel textarea {
+    flex-grow: 1; /* Make textarea fill available space after h2 */
+    width: 100%; /* Fill width of parent */
+    min-height: 200px; /* Ensure it's usable even if parent is small */
+    background-color: #080808; /* Very dark for text editing */
+    color: #a0a0a0;
+    border: 1px solid #000000;
+    padding: 12px; /* More padding */
+    border-radius: 3px;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+    /* font-family, font-size, line-height inherited or from components.css */
+    box-sizing: border-box; /* Important */
+}
+/* Focus state from components.css */

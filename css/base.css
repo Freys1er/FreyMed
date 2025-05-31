@@ -1,0 +1,67 @@
+/* css/base.css */
+
+/* --- Global Reset & Body Setup --- */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Changed from overflow-x: hidden to hide all body scrollbars */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch; /* For potentially scrollable elements *within* the page */
+
+    display: flex; /* This is important for #game-interface to fill height */
+    flex-direction: column; /* #game-interface will be a column child */
+}
+
+body {
+    font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    user-select: none; /* Prevent text selection on most elements */
+    /* Colors and background moved to theme.css */
+}
+
+/* Specific font family classes that JS will toggle on the <body> */
+body.font-normal {
+    font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
+}
+body.font-monospace {
+    font-family: 'Consolas', 'Menlo', 'Courier New', Courier, monospace;
+}
+body.font-handwriting {
+    font-family: 'Kalam', 'Comic Sans MS', cursive;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Basic heading and paragraph styling (can be overridden by more specific selectors) */
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+    font-weight: 500; /* Default medium weight */
+}
+
+p {
+    margin-top: 0;
+    margin-bottom: 1em; /* Default paragraph spacing */
+}
+
+a {
+    text-decoration: none; /* Remove underlines by default */
+    /* Color for links will be in theme.css */
+}
+
+/* Utility for screen reader only content if needed */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

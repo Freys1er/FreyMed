@@ -1,0 +1,134 @@
+/* css/components.css */
+
+/* --- Buttons (General Styling, can be overridden) --- */
+button, .button-like { /* Apply .button-like to <a> tags for consistent styling */
+    background-color: #111111;
+    color: #b0b0b0;
+    border: 1px solid #000000; /* Black border */
+    padding: 0 15px; /* Default padding */
+    height: 28px; /* Default height */
+    line-height: 26px; /* text-align fix */
+    border-radius: 1000px; /* Standard curved edges */
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.9em;
+    transition: all 0.15s ease-out;
+    text-align: center;
+    user-select: none;
+}
+button:hover, .button-like:hover {
+    background-color: #222222;
+    color: #d0d0d0;
+}
+button:active, .button-like:active {
+    background-color: #333333;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+    color: #a0a0a0;
+}
+button:disabled, .button-like:disabled {
+    color: #AAAAAA;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* --- Input Fields (General) --- */
+input[type="text"],
+input[type="password"],
+input[type="email"], /* Add other types as needed */
+select,
+textarea {
+    padding: 9px 10px;
+    border: 1px solid #000000;
+    background-color: #0a0a0a; /* Very dark input background */
+    color: #b0b0b0;
+    border-radius: 4px;
+    outline: none;
+    font-size: 0.95em; /* Consistent font size for inputs */
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+select:focus,
+textarea:focus {
+    border-color: #4a7ac1; /* Accent color on focus */
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5), 0 0 0 2px rgba(74, 122, 193, 0.2); /* Glow effect */
+}
+select {
+    min-width: 180px; /* Default min width for select */
+    /* Appearance reset for more consistent styling might be needed for select across browsers */
+}
+textarea {
+    resize: vertical; /* Allow vertical resize */
+    line-height: 1.5;
+}
+
+/* --- Player Command Input Area Specifics (Footer) --- */
+#player-command-input { /* Already specific in layout, but can refine here */
+    background-color: #0a0a0a; /* Darker than general inputs potentially */
+    font-size: 1em; /* Slightly larger for command input */
+    width: 95%; /* Wider input field */
+}
+#submit-command-btn { /* Uses general button styles, can be more specific if needed */
+    height: 36px; /* Match input field visual height better */
+    line-height: 34px;
+}
+
+/* --- Content Lists (e.g., for patients, scenarios) --- */
+.content-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.content-list li {
+    background-color: #1a1a1a; /* Dark list items */
+    padding: 10px 12px;
+    margin-bottom: 4px; /* Tighter spacing */
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid #000000;
+    border-left: 3px solid #1a1a1a;
+    transition: background-color 0.15s, border-left-color 0.15s, color 0.15s;
+    font-size: 0.9em;
+}
+.content-list li:hover {
+    background-color: #252525;
+    border-left-color: #5a8ed6;
+    color: #c8c8c8;
+}
+.content-list li span { /* For text within list item */
+    flex-grow: 1;
+}
+.content-list li button { /* Buttons within list items, make them smaller */
+    padding: 0 10px;
+    height: 24px;
+    line-height: 22px;
+    font-size: 0.8em;
+    margin-left: 10px;
+}
+
+/* Spinner (from scenario-panel.css, moved here as a general component) */
+.in-tab-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    text-align: center;
+    color: #777; /* Dimmer loading text */
+}
+.spinner {
+    border: 3px solid #222; /* Darker track */
+    border-top: 3px solid #5a8ed6; /* Accent spinner */
+    border-radius: 50%;
+    width: 24px; /* Smaller spinner */
+    height: 24px;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
