@@ -1,0 +1,41 @@
+<!-- components/homeScreen/homeScreen.html -->
+<div class="home-panel-content"> <!-- Root class for css/home-panel.css -->
+    <h2 id="home-welcome-message">Welcome!</h2>
+    <p>Hone your medical decision-making skills in realistic scenarios.</p>
+
+    <div class="data-section"> <!-- Reusing .data-section style -->
+        <h3>Current Status</h3>
+        <div class="status-item">
+            <strong>API Key:</strong>
+            <span id="home-api-key-status" style="padding-left: 5px;">NOT SET</span>
+        </div>
+        <div class="status-item">
+            <strong>Player Progress:</strong>
+            <div id="home-player-progress-details" class="player-progress-details">
+                <p>No game data found. Start a new scenario!</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="data-section" id="new-scenario-setup">
+        <h3>Start New Scenario</h3>
+        <p id="home-scenario-prompt-message">Configure API Key to enable AI scenarios.</p>
+
+        <div class="form-group">
+            <p class="form-label" id="scenario-profession-label">Your Profession/Role (e.g., ER Doctor, Paramedic):</p>
+            <input type="text" id="home-scenario-profession-input" class="home-input" placeholder="ER Doctor" aria-labelledby="scenario-profession-label">
+        </div>
+        <div class="form-group">
+            <p class="form-label" id="scenario-details-label">Scenario Details / Patient Complaint (optional):</p>
+            <textarea id="home-scenario-details-input" class="home-textarea" placeholder="e.g., 'Chest pain after MVA', or 'Child with fever'"></textarea>
+        </div>
+        <button id="home-start-new-game-btn" class="data-section-button">Generate Scenario</button>
+    </div>
+    <hr>
+    <div class="data-section">
+        <h3>Recently Closed Scenarios</h3>
+        <div id="home-recently-closed-list">
+            <p style="color: #888;">No recently closed scenarios found.</p>
+        </div>
+    </div>
+</div>

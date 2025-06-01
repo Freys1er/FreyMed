@@ -1,34 +1,66 @@
 /* css/base.css */
 
 /* --- Global Reset & Body Setup --- */
-html, body {
+html,
+body {
     margin: 0;
     padding: 0;
     height: 100%;
     width: 100%;
-    overflow: hidden; /* Changed from overflow-x: hidden to hide all body scrollbars */
+    overflow: hidden;
+    /* Changed from overflow-x: hidden to hide all body scrollbars */
     overscroll-behavior: none;
-    -webkit-overflow-scrolling: touch; /* For potentially scrollable elements *within* the page */
+    -webkit-overflow-scrolling: touch;
+    /* For potentially scrollable elements *within* the page */
+    box-sizing: border-box;
 
-    display: flex; /* This is important for #game-interface to fill height */
-    flex-direction: column; /* #game-interface will be a column child */
+    display: flex;
+    /* This is important for #game-interface to fill height */
+    flex-direction: column;
+    /* #game-interface will be a column child */
+}
+
+*,
+*:before,
+*:after {
+    box-sizing: inherit;
+    /* Apply border-box to all elements */
 }
 
 body {
     font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
     font-size: 14px;
     line-height: 1.6;
-    user-select: none; /* Prevent text selection on most elements */
-    /* Colors and background moved to theme.css */
+    user-select: none;
+    margin: 0;
+    /* Ensure no default body margin */
+    padding: 0;
+    /* Ensure no default body padding */
+    height: 100%;
+    /* Make body take full viewport height */
+    width: 100%;
+    /* Make body take full viewport width */
+    overflow: hidden;
+    /* CRITICAL: Prevents body itself from scrolling */
+    display: flex;
+    /* Make body a flex container */
+    flex-direction: column;
+    /* Stack its children vertically */
+    background-color: #000000;
+    /* From theme.css */
+    color: #ffffff;
+    /* From theme.css */
 }
 
 /* Specific font family classes that JS will toggle on the <body> */
 body.font-normal {
     font-family: 'Roboto', 'Arial', Helvetica, sans-serif;
 }
+
 body.font-monospace {
     font-family: 'Consolas', 'Menlo', 'Courier New', Courier, monospace;
 }
+
 body.font-handwriting {
     font-family: 'Kalam', 'Comic Sans MS', cursive;
 }
@@ -38,18 +70,26 @@ body.font-handwriting {
 }
 
 /* Basic heading and paragraph styling (can be overridden by more specific selectors) */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
     margin-top: 0;
-    font-weight: 500; /* Default medium weight */
+    font-weight: 500;
+    /* Default medium weight */
 }
 
 p {
     margin-top: 0;
-    margin-bottom: 1em; /* Default paragraph spacing */
+    margin-bottom: 1em;
+    /* Default paragraph spacing */
 }
 
 a {
-    text-decoration: none; /* Remove underlines by default */
+    text-decoration: none;
+    /* Remove underlines by default */
     /* Color for links will be in theme.css */
 }
 

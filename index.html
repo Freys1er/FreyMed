@@ -3,53 +3,105 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Frey Medical Simulator</title> <!-- Changed from Critical Choices -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Frey Medical Simulator</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Kalam&display=swap" rel="stylesheet">
+    <!-- Handwriting Option -->
 
-    <!-- CSS Files -->
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/theme.css"> <!-- Theme for colors early -->
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/tabs.css">
-    <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/home-panel.css">
-    <link rel="stylesheet" href="css/data-panel.css">
-    <link rel="stylesheet" href="css/notes-panel.css">
-    <link rel="stylesheet" href="css/scenario-panel.css">
+    <!-- Global CSS Files (Order Can Matter) -->
+    <link rel="stylesheet" href="css/base.css"> <!-- Resets, global typography, utilities -->
+    <link rel="stylesheet" href="css/theme.css"> <!-- Color palette, dark mode specifics -->
+    <link rel="stylesheet" href="css/layout.css"> <!-- Main page structure (header, main, footer) -->
+    <link rel="stylesheet" href="css/global-tabs.css"> <!-- Main application tabs -->
+    <link rel="stylesheet" href="css/components.css"> <!-- Common UI elements (buttons, inputs, lists) -->
+
+    <!-- Component-Specific CSS (Load after global/component styles if they override) -->
+    <!-- Screens that are typically loaded into global tabs -->
+    <link rel="stylesheet" href="components/homeScreen/homeScreen.css">
+    <link rel="stylesheet" href="components/dataManagementScreen/dataManagementScreen.css">
+    <link rel="stylesheet" href="components/notesScreen/notesScreen.css">
+    <!-- Scenario Player (if it has its own overarching styles beyond just monitor embedding) -->
+    <link rel="stylesheet" href="components/scenarioPlayer/scenarioPlayer.css">
+
+    <!-- Reusable Monitor Components CSS -->
+    <link rel="stylesheet" href="components/monitors/pulseOximeter/pulseOximeter.css">
+    <link rel="stylesheet" href="components/monitors/ecgDisplay/ecgDisplay.css">
+    <link rel="stylesheet" href="components/monitors/nbpDisplay/nbpDisplay.css">
+    <!-- Add more component CSS links as you create them -->
+
+    <!-- Favicon (Optional but good practice) -->
+    <!-- <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon"> -->
 
 </head>
 
 <body>
-    <!-- Main Game Interface (structure remains the same) -->
+    <!-- Main Game Interface Structure -->
     <div id="game-interface">
         <header id="main-header">
-            <nav id="global-tab-bar"></nav>
+            <!-- Logo/Title could go here if desired, outside the tab bar -->
+            <!-- <div id="app-title-logo">Frey Medical Sim</div> -->
+            <nav id="global-tab-bar">
+                <!-- Global application tabs will be dynamically inserted here by JS -->
+            </nav>
         </header>
-        <main id="main-content-area"></main>
-        <footer id="input-area" class="hidden">
-            <div id="global-scenario-timer-display" class="footer-timer">00:00</div> <!-- NEW -->
-            <input type="text" id="player-command-input" placeholder="Enter action">
+
+        <main id="main-content-area">
+            <!-- Content for the active global tab (which might be a component's HTML) will be rendered here -->
+        </main>
+
+        <footer id="input-area" class="hidden"> <!-- Starts hidden, shown when a scenario is active -->
+            <div id="global-scenario-timer-display" class="footer-timer">00:00</div>
+            <input type="text" id="player-command-input" placeholder="Enter action or command...">
             <button id="submit-command-btn">Submit</button>
         </footer>
     </div>
 
-    <!-- In index.html -->
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/gemini.min.js"
-        onload="sdkLoaded()"></script>
+    <!-- External Libraries/SDKs First -->
+    <!-- The onload="sdkLoaded()" is for the SDK approach. If using direct HTTP, it might not be needed, -->
+    <!-- but having a global function that signals when external scripts are ready can be useful. -->
+    <!-- For now, assuming direct HTTP, so onload is less critical for this specific script. -->
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/gemini.min.js"></script>
 
-    <!-- Your other scripts -->
-    <script src="js/storage.js"></script>
-    <script src="js/ui.js"></script>
-    <script src="js/game.js"></script>
-    <script src="js/gemini.js"></script>
+    <!-- Core Application JavaScript Files (Order Matters) -->
+    <script src="js/storage.js"></script> <!-- Defines 'storage' object -->
+    <script src="js/ui.js"></script> <!-- Defines 'ui' object (global UI functions, template loading) -->
+    <script src="js/game.js"></script> <!-- Defines 'game' object (core game rules, non-UI state) -->
+    <script src="js/gemini.js"></script> <!-- Defines 'gemini' object (API interaction) -->
+    <script src="js/preventBodyScroll.js"></script> <!-- Defines 'gemini' object (API interaction) -->
+    <script src="js/audioManager.js"></script>
+    <script src="js/animations.js"></script>
+
+    <!-- Component-Specific JavaScript Files -->
+    <!-- Load these if they define global objects or need to self-initialize/register. -->
+    <!-- If they only export functions to be called by main.js/ui.js, they might not all need to be here -->
+    <!-- depending on your module strategy (global vs. ES6 modules with a bundler). -->
+    <!-- Assuming global objects for now for simplicity based on current structure. -->
+
+    <!-- Screen/Feature Level Component JS -->
+    <script src="components/homeScreen/homeScreen.js"></script> <!-- If homeScreen has its own JS logic -->
+    <script src="components/dataManagementScreen/dataManagementScreen.js"></script> <!-- If dataScreen has JS -->
+    <script src="components/notesScreen/notesScreen.js"></script> <!-- If notesScreen has JS -->
+    <script src="components/scenarioPlayer/scenarioPlayer.js"></script> <!-- Logic for the scenario player UI -->
+
+    <!-- Reusable Monitor Component JS -->
+    <script src="components/monitors/pulseOximeter/pulseOximeter.js"></script>
+    <script src="components/monitors/ecgDisplay/ecgDisplay.js"></script>
+    <script src="components/monitors/nbpDisplay/nbpDisplay.js"></script>
+    <!-- Add more component JS links as you create them -->
+
+
+    <!-- Main Application Orchestrator (Last among your custom scripts) -->
     <script src="js/main.js"></script>
+
+
+    <!-- Utility scripts that might modify global styles or depend on the full DOM -->
     <script src="js/preventBodyScroll.js"></script>
+
 </body>
 
 </html>

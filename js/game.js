@@ -210,54 +210,74 @@ const game = {
         return panel;
     },
 
-    handlePlayerCommand: async function (command, activeTabId, appData) { // Removed appendToMainContent, ui.js handles it
-        console.log(`GAME: Command "${command}" for tab "${activeTabId}"`);
+
+    handlePlayerCommand: async function (originalCommand, commandWithContext, activeTabId, appData) {
+        console.log(`GAME: Command "${originalCommand}" for tab "${activeTabId}"`);
         let modified = false;
         if (!activeTabId.startsWith('scenario-')) return modified;
 
         const currentScenario = appData.playerData.activeScenarios[activeTabId];
-        if (!currentScenario) {
-            console.warn(`GAME: Active scenario data not found for tab ${activeTabId}`);
-            ui.appendToScenarioLog(activeTabId, "Error: Current scenario data not found. Please try re-opening.", false);
-            return modified;
-        }
+        if (!currentScenario) { /* ... error handling ... */ return modified; }
+        // ... (ensure eventLog, chatHistory exist) ...
 
-        // Ensure chatHistory array exists
-        if (!currentScenario.chatHistory) currentScenario.chatHistory = [];
-
-        ui.appendToScenarioLog(activeTabId, `> ${command}`, true); // Show player command in UI
-        currentScenario.eventLog.push({ type: 'player', text: command, timestamp: Date.now() });
+        ui.appendToScenarioLog(activeTabId, `> ${originalCommand}`, true);
+        currentScenario.eventLog.push({ type: 'player', text: originalCommand, timestamp: Date.now() });
         modified = true;
 
+        // --- Local Command Parsing (still useful for direct overrides) ---
+        // ... (your existing local command parser for "set hr goal", "monitor pleth speed", etc.) ...
+        // if (commandHandledLocally) { return modified; }
+        // For this test, let's assume local commands are temporarily disabled or checked after Gemini
+        // to see if Gemini can drive these. Or, Gemini can be the primary driver.
+
         const thinkingMessageId = `thinking-${Date.now()}`;
-        ui.appendToScenarioLog(activeTabId, `<p id="${thinkingMessageId}" class="system-message thinking-message">AI is thinking...</p>`, false);
+        ui.appendToScenarioLog(activeTabId, `<p id="${thinkingMessageId}" class="system-message thinking-message">...</p>`, false);
 
-        // Pass current chat history to gemini.ask
-        const aiResponse = await gemini.ask(command, currentScenario.chatHistory);
+        const aiResponseObject = await gemini.ask(commandWithContext, currentScenario.chatHistory);
 
-        const thinkingElement = document.getElementById(thinkingMessageId);
-        if (thinkingElement) thinkingElement.remove();
+        // ... (remove thinking message) ...
 
-        if (aiResponse && aiResponse.text && !aiResponse.text.toLowerCase().startsWith("error:")) {
-            ui.appendToScenarioLog(activeTabId, aiResponse.text, false); // Show AI response in UI
-            currentScenario.eventLog.push({ type: 'ai', text: aiResponse.text, timestamp: Date.now() });
+        let aiNarrative = "AI response error or no text received.";
+        // Default to empty if not present to avoid errors later
+        let aiStateUpdates = aiResponseObject?.stateUpdates || {};
 
-            // IMPORTANT: Update chatHistory in appData with both user prompt and model response
-            currentScenario.chatHistory.push({ role: 'user', parts: [{ text: command }] });
-            currentScenario.chatHistory.push({ role: 'model', parts: [{ text: aiResponse.text }] });
-            // Limit history length if desired (e.g., last 10-20 turns)
-            // const MAX_HISTORY_TURNS = 10; // 10 pairs of user/model messages
-            // if (currentScenario.chatHistory.length > MAX_HISTORY_TURNS * 2) {
-            //    currentScenario.chatHistory = currentScenario.chatHistory.slice(-MAX_HISTORY_TURNS * 2);
-            // }
-        } else {
-            const errorMsg = (aiResponse && aiResponse.text) ? aiResponse.text : "AI response error or no text received. Please check API key or try again.";
-            ui.appendToScenarioLog(activeTabId, errorMsg, false);
-            currentScenario.eventLog.push({ type: 'system', text: errorMsg, timestamp: Date.now() });
-            console.error("GAME: AI Response Error", aiResponse);
+
+        if (aiResponseObject) {
+            console.log("GAME: Received from gemini.ask:", aiResponseObject);
+            if (aiResponseObject.narrative && !aiResponseObject.narrative.toLowerCase().startsWith("error:")) {
+                aiNarrative = aiResponseObject.narrative;
+                ui.appendToScenarioLog(activeTabId, aiNarrative, false); // Display narrative
+                currentScenario.eventLog.push({ type: 'ai', text: aiNarrative, raw: aiResponseObject.rawResponse, timestamp: Date.now() });
+                // Chat history should store what was sent to AI and what AI rawly responded
+                currentScenario.chatHistory.push({ role: 'user', parts: [{ text: commandWithContext }] });
+                currentScenario.chatHistory.push({ role: 'model', parts: [{ text: aiResponseObject.rawResponse || aiNarrative }] });
+                modified = true;
+            } else if (aiResponseObject.narrative) { // It's an error message from Gemini module itself
+                aiNarrative = aiResponseObject.narrative; // This is the error string
+                ui.appendToScenarioLog(activeTabId, aiNarrative, false);
+                currentScenario.eventLog.push({ type: 'system', text: aiNarrative, timestamp: Date.now() });
+            }
+            // aiStateUpdates is already assigned from aiResponseObject?.stateUpdates
+        } else { // Should not happen if gemini.ask always returns an object
+            ui.appendToScenarioLog(activeTabId, aiNarrative, false);
+            currentScenario.eventLog.push({ type: 'system', text: aiNarrative, timestamp: Date.now() });
+        }
+
+        // --- Process AI-driven State Updates using the helper ---
+        // js/game.js (in handlePlayerCommand)
+        if (Object.keys(aiStateUpdates).length > 0) {
+            console.log("GAME: Attempting to process AI state updates:", aiStateUpdates); // ADD THIS
+            if (window.appShell && typeof window.appShell.processAiStateUpdates === 'function') {
+                window.appShell.processAiStateUpdates(aiStateUpdates, activeTabId, currentScenario.name, appData);
+                console.log("GAME: Called appShell.processAiStateUpdates"); // ADD THIS
+            } else {
+                console.error("GAME: ERROR - appShell.processAiStateUpdates function not found!");
+            }
+            modified = true;
         }
         return modified;
     },
+
 
     endScenario: function (scenarioTabId, appData) {
         console.log(`GAME: Ending scenario ${scenarioTabId}`);

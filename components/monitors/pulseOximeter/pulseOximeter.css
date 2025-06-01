@@ -1,0 +1,126 @@
+/* css/monitors.css or extend scenario-panel.css */
+
+.monitor-panel {
+    padding: 10px;
+    background-color: #050505;
+    /* Very dark background for monitor panels */
+    border-radius: 4px;
+    /* height: 100%; */
+    /* Let content dictate or set fixed if needed */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.monitor-panel h2 {
+    font-size: 1.1em;
+    color: #c0c0c0;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #222;
+    text-align: center;
+}
+
+.monitor-grid {
+    display: flex;
+    /* Could be grid too */
+    gap: 15px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    /* Allow channels to wrap if not enough space */
+}
+
+.monitor-channel {
+    flex: 1;
+    /* Allow channels to grow */
+    min-width: 220px;
+    /* Minimum width for a channel */
+    padding: 10px;
+    background-color: #000000;
+    /* Black background for individual channels */
+    border: 1px solid #181818;
+    border-radius: 3px;
+}
+
+.waveform-title {
+    font-size: 0.8em;
+    color: #777;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+
+.monitor-canvas {
+    display: block;
+    width: 100%;
+    /* Canvas takes full width of its channel */
+    height: 60px;
+    /* Fixed height, or responsive */
+    background-color: #000000;
+    /* Black canvas background */
+    border-radius: 2px;
+    margin-bottom: 5px;
+}
+
+.pleth-wave-canvas {
+    /* Specific styling if needed */
+}
+
+.vital-value {
+    font-size: 1.8em;
+    /* Larger display for main value */
+    font-weight: bold;
+    text-align: right;
+    font-family: 'Courier New', Courier, monospace;
+    /* Digital look */
+}
+
+.vital-value.spo2-value {
+    color: #00FFFF;
+    /* Cyan */
+}
+
+.vital-value.hr-value {
+    color: #00FF00;
+    /* Green */
+}
+
+.vital-value.large-vital {
+    font-size: 2.5em;
+}
+
+.vital-value span {
+    /* The actual number */
+    /* Specific styling for the number if different from label */
+}
+
+.small-text {
+    font-size: 0.75em;
+    color: #666;
+    text-align: right;
+    margin-top: 3px;
+}
+
+.monitor-controls {
+    margin-top: auto;
+    /* Push controls to the bottom if panel is flex column */
+    padding-top: 10px;
+    border-top: 1px solid #222;
+    text-align: right;
+}
+
+.monitor-controls .data-section-button {
+    /* Reuse button style */
+    margin-left: 5px;
+}
+
+/* In your monitor CSS */
+.monitor-canvas.pleth-wave-canvas {
+    width: 100%;
+    /* Or a fixed pixel value like 250px */
+    height: 60px;
+    /* Or a fixed pixel value */
+    background-color: #000000;
+    /* Ensure it has a background */
+    border: 1px solid #111;
+    /* Optional border */
+}

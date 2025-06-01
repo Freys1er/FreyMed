@@ -1,51 +1,94 @@
-// js/main.js
+// js/main.js (Only the initializeGame function and its direct dependencies within main.js)
 
-// --- Application State ---
+// Assume these are defined globally or at the top of main.js
 let appData = {};
 let activeGlobalTabId = null;
-let globalTabConfigurations = [];
+let globalTabConfigurations = []; // This will be populated by initializeGame
+// let isScenarioStarting = false; // Not directly used in initializeGame but part of global state
+// let logicTimerId = null; // Also not directly used in initializeGame but part of global state
 
-let gameTimerInterval = null; // For the global scenario timer
-const TIMER_UPDATE_INTERVAL_MS = 100; // Update timer display every second
-// recentlyClosedScenarios is part of appData.playerData
+// Assume these functions are defined elsewhere in main.js or globally via window.appShell
+// - storage.getAppData
+// - gemini.isReady, gemini.initialize
+// - ui.applyFontPreference, ui.updateFooterTimerDisplay
+// - updateGlobalTabsAndContent (defined in main.js)
+// - addPulseOximeterTabForScenario (defined in main.js)
+// - game.getScenarioPlayScreenContent (defined in game.js)
+// - window.animations.startAnimationLoop (defined in animations.js)
+// - startGlobalGameTimerLogic (defined in main.js)
 
-// --- Initialization ---
 function initializeGame() {
     console.log("MAIN: Initializing game...");
-    appData = storage.getAppData(); // storage.getAppData() should provide defaults for timer fields
-    console.log("MAIN: Loaded appData:", JSON.parse(JSON.stringify(appData)));
+    appData = storage.getAppData(); // Load all persisted data
+    window.audioManager.init();
+    console.log("MAIN: Loaded appData:", JSON.parse(JSON.stringify(appData))); // Log a deep copy
 
-    // Ensure active scenarios from old saves have necessary timer fields initialized
-    if (appData.playerData && appData.playerData.activeScenarios) {
-        for (const scenarioId in appData.playerData.activeScenarios) {
-            const scenario = appData.playerData.activeScenarios[scenarioId];
-            if (!scenario.hasOwnProperty('elapsedSeconds')) scenario.elapsedSeconds = 0;
-            if (!scenario.hasOwnProperty('isPaused')) scenario.isPaused = false;
-            if (!scenario.startTimestamp) scenario.startTimestamp = Date.now(); // Should exist from creation
-            scenario.lastUpdatedTimestamp = Date.now(); // Critical: reset for current session
-            console.log(`MAIN: Initialized/Checked timer fields for restored scenario ${scenarioId}`);
-        }
-    }
-
-
-    if (appData.apiKey && !gemini.isReady()) {
+    // Initialize Gemini if API key exists
+    if (appData.apiKey && typeof gemini !== 'undefined' && !gemini.isReady()) {
         console.log("MAIN: API key found, initializing Gemini...");
         gemini.initialize(appData.apiKey);
     }
 
-    ui.applyFontPreference(appData.preferences.font || 'normal');
+    // Apply user preferences
+    if (typeof ui !== 'undefined' && typeof ui.applyFontPreference === 'function') {
+        ui.applyFontPreference(appData.preferences?.font || 'normal');
+    }
 
+    // --- Setup Base Global Tab Configurations ---
     globalTabConfigurations = [
-        { id: 'home', label: 'Home', isCloseable: false },
-        { id: 'data', label: 'Data & Settings', isCloseable: false },
-        { id: 'notes', label: 'Notes', isCloseable: false },
+        {
+            id: 'home',
+            label: 'Home',
+            isCloseable: false,
+            contentGenerator: (currentAppData) => window.homeScreen?.getContentElement?.(
+                currentAppData.playerData,
+                !!currentAppData.apiKey,
+                window.appShell?.handleStartNewGame, // Assuming appShell is defined by end of main.js
+                window.appShell?.getRecentlyClosedScenarios,
+                window.appShell?.reopenClosedScenario
+            ) || Promise.resolve(document.createTextNode("Home Screen Error: Module not fully loaded."))
+        },
+        {
+            id: 'data',
+            label: 'Data & Settings',
+            isCloseable: false,
+            contentGenerator: (currentAppData) => typeof ui !== 'undefined' ? ui.createDataManagementPanel?.(
+                currentAppData,
+                window.appShell?.handleApiKeyChange, // These will be assigned to appShell later
+                window.appShell?.handleFontPreferenceChange,
+                window.appShell?.handleImportRequest,
+                window.appShell?.handleExportRequest
+            ) : document.createTextNode("Data Screen Error: UI Module not fully loaded.")
+        },
+        {
+            id: 'notes',
+            label: 'Notes',
+            isCloseable: false,
+            contentGenerator: (currentAppData) => window.notesScreen?.getContentElement?.(
+                currentAppData.notes,
+                (updatedNotes) => { // Callback to save notes
+                    currentAppData.notes = updatedNotes;
+                    storage.saveAppData(currentAppData);
+                }
+            ) || Promise.resolve(document.createTextNode("Notes Screen Error: Module not fully loaded."))
+        }
     ];
+    console.log("MAIN: Initial static globalTabConfigurations set:", globalTabConfigurations.length);
 
+    // --- Restore Active Scenario Tabs (as main scenario tabs first) ---
     if (appData.playerData && appData.playerData.activeScenarios) {
         for (const scenarioId in appData.playerData.activeScenarios) {
             const scenario = appData.playerData.activeScenarios[scenarioId];
+            // Ensure timer fields are present for older saves
+            if (!scenario.hasOwnProperty('elapsedSeconds')) scenario.elapsedSeconds = 0;
+            if (!scenario.hasOwnProperty('isPaused')) scenario.isPaused = false;
+            if (!scenario.startTimestamp) scenario.startTimestamp = Date.now();
+            scenario.lastUpdatedTimestamp = Date.now(); // Always reset for current session's tracking
+            scenario.lastMonitorLogicUpdate = Date.now();
+
+
             if (!globalTabConfigurations.find(t => t.id === scenarioId)) {
-                console.log(`MAIN: Restoring active scenario tab: ${scenarioId} - ${scenario.name}`);
+                console.log(`MAIN: Restoring active SCENARIO tab config: ${scenarioId} - ${scenario.name}`);
                 globalTabConfigurations.push({
                     id: scenarioId,
                     label: scenario.name || "Scenario",
@@ -55,63 +98,120 @@ function initializeGame() {
             }
         }
     }
+    console.log("MAIN: globalTabConfigurations after restoring scenarios:", globalTabConfigurations.length);
 
-    const initialHashTab = window.location.hash.substring(1);
-    let tabToActivate = 'home';
-    if (initialHashTab && globalTabConfigurations.some(tab => tab.id === initialHashTab)) {
-        tabToActivate = initialHashTab;
-    } else {
+    // --- Determine Initial Tab to Activate (considering hash) ---
+    const initialHashTabId = window.location.hash.substring(1);
+    let tabToActivate = 'home'; // Default
+
+    if (initialHashTabId) {
+        console.log("MAIN: Initial hash found:", initialHashTabId);
+        // Check if hash is for an already configured tab (static, or a main scenario tab)
+        if (globalTabConfigurations.some(tab => tab.id === initialHashTabId)) {
+            tabToActivate = initialHashTabId;
+            console.log("MAIN: Hash matches existing configured tab:", tabToActivate);
+        }
+        // Check if hash is for a monitor tab (which needs its parent scenario and itself configured)
+        else if (initialHashTabId.startsWith('pulseox-monitor-')) {
+            const scenarioIdForMonitor = initialHashTabId.replace('pulseox-monitor-', '');
+            const mainScenarioExists = globalTabConfigurations.some(t => t.id === scenarioIdForMonitor);
+            const scenarioData = appData.playerData.activeScenarios?.[scenarioIdForMonitor];
+
+            if (mainScenarioExists && scenarioData) {
+                console.log(`MAIN: Hash is for PulseOx tab ${initialHashTabId}. Ensuring its config.`);
+                // addPulseOximeterTabForScenario will handle if already in globalTabConfigurations
+                // It will be called below if this tab is to be activated.
+                // For now, just mark it as the one to activate.
+                tabToActivate = initialHashTabId;
+            } else {
+                console.warn(`MAIN: Hash for monitor ${initialHashTabId}, but main scenario ${scenarioIdForMonitor} config or data not found. Defaulting.`);
+                tabToActivate = 'home'; // Fallback
+            }
+        }
+        // Add similar blocks for other monitor types if they can be hash-linked
+    }
+
+    // Fallback activation logic if hash didn't resolve or wasn't present
+    if (tabToActivate === 'home' && !initialHashTabId) { // Only apply fallback if no hash tried to set it
         if (!appData.apiKey) tabToActivate = 'data';
         else if (!appData.playerData || !appData.playerData.stats || appData.playerData.stats.operationsCompleted === 0) tabToActivate = 'home';
-        else tabToActivate = 'home';
+        // else tabToActivate remains 'home'
     }
+
+    // If tabToActivate is a monitor but not yet in globalTabConfigurations, add it now.
+    // This covers the case where the hash points directly to a monitor tab.
+    if (tabToActivate.startsWith('pulseox-monitor-') && !globalTabConfigurations.some(t => t.id === tabToActivate)) {
+        const scenarioIdForMonitor = tabToActivate.replace('pulseox-monitor-', '');
+        const scenarioData = appData.playerData.activeScenarios?.[scenarioIdForMonitor];
+        if (scenarioData && typeof addPulseOximeterTabForScenario === "function") { // Ensure function is defined
+            addPulseOximeterTabForScenario(scenarioIdForMonitor, scenarioData.name, {}); // Add with default vitals initially
+        } else if (!scenarioData) {
+            console.warn(`MAIN: Cannot add PulseOx tab for ${tabToActivate} from hash; scenario data ${scenarioIdForMonitor} missing. Defaulting active tab.`);
+            tabToActivate = 'home'; // Fallback
+        }
+    }
+    // Add for other monitors (ECG, NBP) similarly
+
     activeGlobalTabId = tabToActivate;
-    console.log("MAIN: Initial active tab ID:", activeGlobalTabId);
-    updateGlobalTabsAndContent();
-    startGlobalGameTimer(); // Start the timer
+    console.log("MAIN: Final initial active tab ID selected:", activeGlobalTabId);
+
+    // --- Perform Initial UI Rendering and Start Loops ---
+    if (typeof updateGlobalTabsAndContent === "function") {
+        updateGlobalTabsAndContent(); // This renders tabs and the active panel
+    } else {
+        console.error("MAIN: updateGlobalTabsAndContent function is not defined!");
+    }
+
+
+    // Explicitly update footer timer for the initial active scenario if it exists
+    // This should happen AFTER updateGlobalTabsAndContent has run, which calls renderActiveTabContent
+    // renderActiveTabContent itself should handle initial timer display for its content.
+    // This is a bit redundant but ensures footer is set.
+    if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+        const currentScenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
+        if (currentScenario && typeof ui !== 'undefined') {
+            ui.updateFooterTimerDisplay(currentScenario.elapsedSeconds, currentScenario.isPaused);
+        } else if (typeof ui !== 'undefined') {
+            ui.updateFooterTimerDisplay(null);
+        }
+    } else if (typeof ui !== 'undefined') {
+        ui.updateFooterTimerDisplay(null);
+    }
+
+    if (window.animations && typeof window.animations.startAnimationLoop === 'function') {
+        window.animations.startAnimationLoop(); // <<< START THE ANIMATION LOOP
+    } else {
+        console.error("MAIN: animations.startAnimationLoop function not found!");
+    }
+    console.log("MAIN: Initialization complete.");
 }
 
 // --- Tab Navigation and Management ---
 function updateGlobalTabsAndContent() {
-    console.log("MAIN: Updating global tabs and content. Active tab:", activeGlobalTabId);
+    console.log("MAIN_updateGlobalTabs: Active Tab:", activeGlobalTabId, "Tab Configs:", globalTabConfigurations.length);
     ui.renderGlobalTabs(globalTabConfigurations, activeGlobalTabId, handleTabClick, handleTabClose);
-    renderActiveTabContent();
+    renderActiveTabContent(); // This will render the content of activeGlobalTabId
     window.location.hash = activeGlobalTabId || "";
 }
 
+
 function handleTabClick(tabId) {
-    console.log("MAIN: Tab clicked:", tabId);
-    const previousActiveTabId = activeGlobalTabId; // Store previous active tab
-
+    const previousActiveTabId = activeGlobalTabId;
     if (previousActiveTabId !== tabId) {
-        // Update timer for the tab being switched AWAY from (if it's a scenario)
-        if (previousActiveTabId && previousActiveTabId.startsWith('scenario-')) {
-            const oldScenario = appData.playerData.activeScenarios?.[previousActiveTabId];
-            if (oldScenario && !oldScenario.isPaused) {
-                const now = Date.now();
-                const deltaSeconds = Math.floor((now - oldScenario.lastUpdatedTimestamp) / 1000);
-                if (deltaSeconds >= 0) { // Allow 0 for immediate update
-                    oldScenario.elapsedSeconds += deltaSeconds;
-                    oldScenario.lastUpdatedTimestamp = now;
-                }
-            }
-        }
-
+        // No need to manually update elapsedSeconds of old tab here,
+        // the logic loop in animations.js handles it based on _lastLogicUpdateTime.
         activeGlobalTabId = tabId;
-
-        // Update/reset footer timer based on the NEW active tab
         if (activeGlobalTabId.startsWith('scenario-')) {
             const newScenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
-            if (newScenario) {
-                if (!newScenario.isPaused) newScenario.lastUpdatedTimestamp = Date.now(); // Reset for accurate timing
-                ui.updateFooterTimerDisplay(newScenario.elapsedSeconds, newScenario.isPaused);
-            } else {
-                ui.updateFooterTimerDisplay(null); // Scenario data not found
+            if (newScenario && !newScenario.isPaused) {
+                // When a tab becomes active, ensure its lastUpdatedTimestamp is fresh
+                // so the logic in animations.js doesn't calculate a huge leap.
+                newScenario.lastUpdatedTimestamp = Date.now();
+                newScenario.lastMonitorLogicUpdate = Date.now();
             }
-        } else {
-            ui.updateFooterTimerDisplay(null); // Not a scenario tab
         }
-        updateGlobalTabsAndContent(); // This will re-render in-tab timer via getScenarioPlayScreenContent
+        if (window.animations) window.animations.resetDisplayOptimizationFlags();
+        updateGlobalTabsAndContent();
     }
 }
 
@@ -152,67 +252,112 @@ function handleTabClose(tabId) {
 }
 
 function addGlobalTab(id, label, isCloseable = true, switchToNewTab = true, contentGenerator = null) {
-    console.log(`MAIN: Adding tab: ${id} - ${label}`);
+    console.log(`MAIN_addGlobalTab: Adding tab with ID: ${id}, Label: ${label}, Closeable: ${isCloseable}, SwitchTo: ${switchToNewTab}`);
     if (globalTabConfigurations.find(tab => tab.id === id)) {
-        console.warn(`MAIN: Tab with id "${id}" already exists.`);
-        if (switchToNewTab) handleTabClick(id);
-        return;
+        console.warn(`MAIN_addGlobalTab: Tab with id "${id}" already exists. Will attempt to switch if switchToNewTab is true.`);
+        if (switchToNewTab) {
+            handleTabClick(id); // This will set activeGlobalTabId and call updateGlobalTabsAndContent
+        }
+        return; // Important to return here to prevent adding duplicate config
     }
+
     const generatorFn = typeof contentGenerator === 'function' ? contentGenerator :
-        (currentAppData) => game.getScenarioPlayScreenContent(id, currentAppData, "Loading scenario details...");
+        (currentAppData) => game.getScenarioPlayScreenContent(id, currentAppData, "Loading details..."); // Fallback for scenarios
+
     globalTabConfigurations.push({ id, label, isCloseable, contentGenerator: generatorFn });
-    if (switchToNewTab) activeGlobalTabId = id;
-    updateGlobalTabsAndContent();
+    console.log("MAIN_addGlobalTab: globalTabConfigurations updated:", JSON.parse(JSON.stringify(globalTabConfigurations)));
+
+    if (switchToNewTab) {
+        console.log(`MAIN_addGlobalTab: Switching to new tab ${id}`);
+        // handleTabClick will set activeGlobalTabId and call updateGlobalTabsAndContent
+        handleTabClick(id);
+    } else {
+        // If not switching, we still need to re-render the tab bar to show the new (but not active) tab.
+        console.log("MAIN_addGlobalTab: New tab added but not switched. Re-rendering tab bar.");
+        // We only want to re-render the tabs, not necessarily the content panel of the *currently* active tab
+        // unless the active tab IS the one being added.
+        // The current updateGlobalTabsAndContent will re-render everything. This is usually fine.
+        ui.renderGlobalTabs(globalTabConfigurations, activeGlobalTabId, handleTabClick, handleTabClose);
+    }
+    // updateGlobalTabsAndContent(); // This might be redundant if handleTabClick is called or if only tab bar needs update
 }
 
 // --- Content Rendering Logic ---
 function renderActiveTabContent() {
     console.log("MAIN: Rendering content for active tab:", activeGlobalTabId);
     if (!activeGlobalTabId) {
-        ui.renderTabPanelContent('no-tabs-active', "No active tab selected.");
+        ui.renderTabPanelContent('no-tabs-active', "No active tab selected."); // From ui.js
         return;
     }
-    let contentElementOrHTML;
+
+    let contentPromiseOrElement; // Can be a direct element or a promise that resolves to one
     const activeTabConfig = globalTabConfigurations.find(tab => tab.id === activeGlobalTabId);
 
     if (activeTabConfig && typeof activeTabConfig.contentGenerator === 'function') {
-        contentElementOrHTML = activeTabConfig.contentGenerator(appData);
+        contentPromiseOrElement = activeTabConfig.contentGenerator(appData); // This might be a Promise now
     } else {
         switch (activeGlobalTabId) {
             case 'home':
-                contentElementOrHTML = game.getHomePageContent(
-                    appData.playerData, !!appData.apiKey,
-                    handleStartNewScenarioRequest, // This is now correctly defined before appShell
-                    () => appData.playerData.recentlyClosedScenarios || [],
-                    handleReopenScenarioRequest  // This is also correctly defined
-                );
+                // The contentGenerator for 'home' will be set up in initializeGame
+                // This switch case might become redundant if all tabs use contentGenerators
+                console.warn("MAIN: 'home' tab should use a contentGenerator. Falling back (might be empty).");
+                contentPromiseOrElement = document.createElement('div'); // Empty div as fallback
                 break;
             case 'data':
-                contentElementOrHTML = ui.createDataManagementPanel(appData, handleApiKeyChange, handleFontPreferenceChange, handleImportRequest, handleExportRequest);
+                contentPromiseOrElement = ui.createDataManagementPanel(
+                    appData, handleApiKeyChange, handleFontPreferenceChange,
+                    handleImportRequest, handleExportRequest
+                );
                 break;
             case 'notes':
-                contentElementOrHTML = game.getNotesPageContent(appData.notes, (updatedNotes) => {
+                contentPromiseOrElement = game.getNotesPageContent(appData.notes, (updatedNotes) => {
                     appData.notes = updatedNotes;
                     storage.saveAppData(appData);
                 });
                 break;
             default:
-                contentElementOrHTML = `<h2>${activeGlobalTabId}</h2><p>Content definition missing for this tab configuration.</p>`;
+                contentPromiseOrElement = `<h2>${activeGlobalTabId}</h2><p>Static content definition missing.</p>`;
                 break;
         }
     }
-    ui.renderTabPanelContent(activeGlobalTabId, contentElementOrHTML);
 
-    if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+    // Handle if content is a Promise (from fetching HTML) or a direct HTMLElement/string
+    if (contentPromiseOrElement instanceof Promise) {
+        // Display a loading state in the panel while content is fetching
+        const tempLoadingPanel = document.createElement('div');
+        tempLoadingPanel.className = 'in-tab-loading'; // Use your loading style
+        tempLoadingPanel.innerHTML = '<div class="spinner"></div><p>Loading tab content...</p>';
+        ui.renderTabPanelContent(activeGlobalTabId, tempLoadingPanel); // Show loading
+
+        contentPromiseOrElement.then(element => {
+            // Only render if the tab is still the active one (user might have clicked away)
+            if (activeGlobalTabId === activeTabConfig?.id) {
+                ui.renderTabPanelContent(activeGlobalTabId, element);
+                afterContentRenderedLogic(activeGlobalTabId); // Scroll, etc.
+            }
+        }).catch(error => {
+            console.error(`MAIN: Error loading content for tab ${activeGlobalTabId}:`, error);
+            if (activeGlobalTabId === activeTabConfig?.id) {
+                ui.renderTabPanelContent(activeGlobalTabId, `<p class="error-message">Failed to load content for ${activeTabConfig.label}.</p>`);
+            }
+        });
+    } else {
+        // Content is already an HTMLElement or string
+        ui.renderTabPanelContent(activeGlobalTabId, contentPromiseOrElement);
+        afterContentRenderedLogic(activeGlobalTabId); // Scroll, etc.
+    }
+}
+function afterContentRenderedLogic(tabId) {
+    if (tabId && tabId.startsWith('scenario-')) {
         setTimeout(() => {
-            const outputDivId = `scenario-output-${activeGlobalTabId}`;
+            const outputDivId = `scenario-output-${tabId}`;
             const outputDiv = document.getElementById(outputDivId);
             if (outputDiv) {
-                console.log(`MAIN: Scrolling scenario output ${outputDivId} to bottom.`);
                 outputDiv.scrollTop = outputDiv.scrollHeight;
             }
         }, 0);
     }
+    // Add any other logic needed after content is in the DOM
 }
 
 // --- Settings & Data Management Handlers ---
@@ -295,7 +440,7 @@ async function handleStartNewScenarioRequest(scenarioParams = null) {
     );
 
     try {
-        let initialDescription, patientInfo, scenarioEventLog, currentChatHistory;
+        let initialDescription, patientInfo, scenarioEventLog, currentChatHistory, scenarioStartTimestamp;
 
         if (reopenScenarioData) {
             console.log(`MAIN: Re-opening scenario ${scenarioId}`);
@@ -305,74 +450,104 @@ async function handleStartNewScenarioRequest(scenarioParams = null) {
             currentChatHistory = reopenScenarioData.chatHistory || [];
             // ui.updateScenarioOutput is not strictly needed here if getScenarioPlayScreenContent handles full render
         } else {
-            console.log(`MAIN: Generating new scenario ${scenarioId} with Gemini...`);
-            let scenarioTypeInstruction = "Generate a concise new medical scenario.";
-            const professionLower = userProfession.toLowerCase();
-            const detailsLower = userScenarioDetails.toLowerCase();
-            if (professionLower.includes("er doctor") || professionLower.includes("paramedic") || professionLower.includes("emergency") ||
-                detailsLower.includes("trauma") || detailsLower.includes("critical") || detailsLower.includes("unresponsive") || detailsLower.includes("collapse")) {
-                scenarioTypeInstruction = "Generate a concise, high-intensity medical emergency room (ER) or Intensive Care Unit (ICU) scenario. Focus on critical, life-threatening conditions requiring rapid assessment and intervention.";
-            } else if (professionLower.includes("surgeon") || professionLower.includes("anesthesiologist") || professionLower.includes("operating room") ||
-                detailsLower.includes("surgery") || detailsLower.includes("operation") || detailsLower.includes("appendectomy") || detailsLower.includes("cholecystectomy")) {
-                scenarioTypeInstruction = "Generate a scenario focused on a surgical operation or a pre/post-operative consultation. This could be a planned procedure or an emergent one. Describe the operating room setting or clinic setting if a consult.";
-            } else if (professionLower.includes("general practitioner") || professionLower.includes("gp") || professionLower.includes("family doctor") || professionLower.includes("clinic") ||
-                detailsLower.includes("consultation") || detailsLower.includes("check-up") || detailsLower.includes("chronic") || detailsLower.includes("follow-up")) {
-                scenarioTypeInstruction = "Generate a scenario typical for a general practice or outpatient clinic setting. This could involve a routine check-up, managing a chronic condition, a new patient consultation for non-acute symptoms, or a follow-up visit.";
-            }
-
             let basePrompt = `
-You are an AI assistant generating a medical scenario for a simulation game.
-The user will be playing as a ${userProfession}.
-${scenarioTypeInstruction}
+You are an AI assistant for a medical simulation game. The user is a ${userProfession}.
 
-Please generate the scenario details adhering STRICTLY to the following output structure, using the exact headings provided (including any slashes like "Initial Scene / Setting"):
+Your primary output is narrative text describing the patient, environment, and outcomes of actions.
+HOWEVER, to make the simulation interactive, when specific game state variables need to change,
+you MUST include a special block AFTER your narrative. This block is the *only* way to change these game variables.
 
+The block format is:
+---GAME_STATE_UPDATES---
+VARIABLE_NAME: value
+ANOTHER_VARIABLE: value
+---END_GAME_STATE_UPDATES---
+
+Available variables for GAME_STATE_UPDATES:
+- MONITOR_PULSEOXIMETER_VISIBLE: true_or_false (Use 'true' when the pulse oximeter should be newly attached or made visible. Use 'false' if it's removed/hidden.)
+- VITALS_HEARTRATE_TARGET: number (The target heart rate reading on the monitor.)
+- VITALS_HEARTRATE_DURATION: number (Seconds for HR to reach target. Use 0 for instant change.)
+- VITALS_SPO2_TARGET: number (Target SpO2 reading.)
+- VITALS_SPO2_DURATION: number (Seconds for SpO2 to reach target. Use 0 for instant.)
+- VITALS_NBP_SYSTOLIC_TARGET: number
+- VITALS_NBP_DIASTOLIC_TARGET: number
+- VITALS_NBP_DURATION: 0 (NBP readings are typically instant when taken.)
+- VITALS_TEMP_TARGET: number (Celsius)
+- VITALS_TEMP_DURATION: number (Seconds for Temp to reach target.)
+
+Example 1: Player asks to attach pulse oximeter.
+Your response could be:
+"Okay, I'm attaching the pulse oximeter to the patient's finger now. It's powering on."
+---GAME_STATE_UPDATES---
+MONITOR_PULSEOXIMETER_VISIBLE: true
+VITALS_HEARTRATE_TARGET: 78
+VITALS_HEARTRATE_DURATION: 0
+VITALS_SPO2_TARGET: 97
+VITALS_SPO2_DURATION: 0
+---END_GAME_STATE_UPDATES---
+
+Example 2: Player administers a drug that should lower heart rate.
+Your response could be:
+"The medication seems to be taking effect, you notice the heart rate on the monitor starting to decrease."
+---GAME_STATE_UPDATES---
+VITALS_HEARTRATE_TARGET: 65
+VITALS_HEARTRATE_DURATION: 30
+---END_GAME_STATE_UPDATES---
+
+Example 3: Patient needs to be moved, pulse oximeter disconnected.
+Your response could be:
+"Alright, we're preparing to move. I'll disconnect the pulse oximeter probe for now."
+---GAME_STATE_UPDATES---
+MONITOR_PULSEOXIMETER_VISIBLE: false
+---END_GAME_STATE_UPDATES---
+
+If the player's action does not directly change one of these specific game variables, or if you are just providing a narrative update or answering a question, DO NOT include the GAME_STATE_UPDATES block.
+The game will use the values in the GAME_STATE_UPDATES block to update the visual monitors and internal patient state.
+
+Scenario Structure:
 ## Scenario Name:
-[Provide a very brief, catchy name for the case. Examples: "Sudden Collapse at Mall", "Elective Cholecystectomy", "Worrisome Cough"]
+[A very brief, catchy name for the case.]
 
 ## Initial Scene / Setting:
-[Describe the immediate environment (e.g., ER bay 3, Operating Room 2, ICU Bed 5, a busy clinic examination room).
-For dynamic emergency scenes, detail the patient's arrival (e.g., via ambulance, walk-in) and their most obvious presenting condition.
-For calmer, scheduled scenes (e.g., surgery, clinic visit), describe the room setup and if the patient is already present or just arriving for their appointment.
-Make this section 3-5 sentences long and engaging, setting the stage for the ${userProfession}.]
+[Detailed description of the immediate scene, patient's visible condition, etc. 3-5 sentences. Relevant to ${userProfession}.]
 `;
             if (userScenarioDetails) {
                 basePrompt += `
-The scenario MUST be based on or centrally incorporate the following details, chief complaint, or situation provided by the user: "${userScenarioDetails}".
-Integrate these user-provided details naturally into the "Initial Scene / Setting" and the relevant parts of "Patient Information" below.
+The scenario MUST incorporate: "${userScenarioDetails}". Integrate this into the scene and patient info.
 `;
             } else {
-                basePrompt += `\nGenerate a plausible and typical case that a ${userProfession} would encounter.\n`;
+                basePrompt += `\nGenerate a plausible case for a ${userProfession}.\n`;
             }
             basePrompt += `
 ## Patient Information:
-Follow this exact format for patient details:
-Condition: [Patient's current primary medical state relevant to the scenario, e.g., "Acute Myocardial Infarction", "Pre-operative for appendectomy, stable", "Controlled Type 2 Diabetes with new concerns"]
-Age: [Patient's age, e.g., 62]
-Sex: [Male/Female/Other, or as appropriate]
-Chief Complaint: [The main reason the patient is presenting, as reported or observed. If user provided details, use that as the primary complaint. e.g., "I feel like an elephant is sitting on my chest!", "Persistent abdominal pain for 3 days", "Routine physical exam requested"]
-Initial Observations / Presentation: [Key objective findings or observations a ${userProfession} would note on first encountering the patient in this setting.
-For ER/ICU: Include GCS, general appearance (e.g., pale, diaphoretic, cyanotic), obvious injuries or distress. Example: "GCS 10 (E2V3M5). Pale, cool, clammy skin. Audible wheezing."
-For Surgery: Pre-operative status (e.g., "Alert, oriented, anxious. IV access established.") or key intra-operative point if scenario starts mid-op.
-For GP/Clinic: General appearance, stated mood, any immediately obvious physical signs. Example: "Appears fatigued but in no acute distress. Cooperative."]
-Medical Records / History: [Brief, RELEVANT past medical history, known significant allergies, and key current medications. Focus on what would be quickly available or pertinent. e.g., "PMH: Hypertension, Type 2 Diabetes. Allergies: NKDA. Meds: Metformin 1000mg BID, Lisinopril 10mg OD.", "PMH: Asthma. Allergies: Penicillin (rash). Meds: Salbutamol MDI prn."]
-Bystander/Family Statements / Referral Notes: [A brief, relevant quote or summary from anyone accompanying the patient, or a note from a referring physician if applicable. e.g., "Wife reports he suddenly grabbed his chest and said 'it hurts bad' before collapsing.", "Patient states his previous doctor retired and he needs a new GP.", "Referred by Dr. Anya Sharma for evaluation of persistent cough."]
+Condition: [Patient's primary medical state]
+Age: [Patient's age]
+Sex: [Male/Female/Other]
+Chief Complaint: [Main reason for presentation]
+Initial Observations / Presentation: [Key objective findings relevant to ${userProfession}]
+Medical Records / History: [Brief relevant PMH, allergies, key meds]
+Bystander/Family Statements / Referral Notes: [Brief relevant quote or summary]
 
-Make the scenario challenging but realistic for a ${userProfession}.
-Ensure all requested sections (## Scenario Name, ## Initial Scene / Setting, ## Patient Information with all its sub-fields) are present and populated with appropriate content.
-`;
+Ensure all sections are present and populated.
+The very first thing I (the player, ${userProfession}) see should be the "Initial Scene / Setting".
+What is the initial scene and patient presentation?
+`; // Added a direct question at the end to encourage immediate scenario output.
+            // --- END REVISED PROMPT ---
+
             const initialScenarioPrompt = basePrompt.trim();
-            console.log("MAIN: About to call Gemini. initialScenarioPrompt (first 200 chars):", initialScenarioPrompt.substring(0, 200) + "...");
+            console.log("MAIN: About to call Gemini. initialScenarioPrompt (first 300 chars):\n", initialScenarioPrompt.substring(0, 300) + "...");
             if (!initialScenarioPrompt) throw new Error("Initial scenario prompt is empty!");
 
-            const geminiResponse = await gemini.ask(initialScenarioPrompt, []);
-            console.log("MAIN: Raw Gemini Response Text for parsing:\n", geminiResponse ? geminiResponse.text : "No response text from Gemini"); // Log raw response
+            // For initial generation, pass an EMPTY chatHistory array
+            const geminiResponseObject = await gemini.ask(initialScenarioPrompt, []);
+            console.log("MAIN: Raw Gemini Response Object for parsing:\n", geminiResponseObject);
 
-            if (!geminiResponse || !geminiResponse.text || geminiResponse.text.toLowerCase().startsWith("error:")) {
-                throw new Error(geminiResponse ? geminiResponse.text : "No response from AI for initial scenario.");
+            if (!geminiResponseObject || !geminiResponseObject.narrative || geminiResponseObject.narrative.toLowerCase().startsWith("error:")) {
+                throw new Error(geminiResponseObject ? geminiResponseObject.narrative : "No valid narrative from AI for initial scenario.");
             }
 
-            const parsedData = parseGeminiScenarioData(geminiResponse.text); // Ensure this uses the updated scenarioName
+            // Use rawResponse for parsing, as it contains the full original text from AI
+            const parsedData = parseGeminiScenarioData(geminiResponseObject.rawResponse);
             if (parsedData.scenarioName && parsedData.scenarioName !== scenarioName) {
                 scenarioName = parsedData.scenarioName;
                 const tabConfig = globalTabConfigurations.find(t => t.id === scenarioId);
@@ -382,20 +557,34 @@ Ensure all requested sections (## Scenario Name, ## Initial Scene / Setting, ## 
             patientInfo = parsedData.patientData;
             scenarioEventLog = [
                 { type: 'system', text: `Scenario Started (Role: ${userProfession}): ${new Date().toLocaleString()}`, timestamp: Date.now() },
-                { type: 'system', text: `Initial Scene: ${initialDescription}`, timestamp: Date.now() } // This log might be redundant if initialDescription is displayed directly
+                { type: 'system', text: `Initial Scene: ${initialDescription}`, timestamp: Date.now() }
             ];
-            currentChatHistory = [{ role: "model", parts: [{ text: geminiResponse.text }] }];
-            // Update the scenario tab content with the parsed initial scene
+            // Chat history starts with the AI's full raw response (which might include the state update block)
+            currentChatHistory = [{ role: "model", parts: [{ text: geminiResponseObject.rawResponse }] }];
+            scenarioStartTimestamp = Date.now();
+
+            // Update scenario tab with only the narrative part of the initial scene
             ui.updateScenarioOutput(scenarioId, `<h3>Initial Scene</h3><p>${initialDescription.replace(/\n/g, '<br>')}</p>`, true);
+
+            // Process any state updates Gemini might have included in its *initial* scenario generation
+            if (geminiResponseObject.stateUpdates && Object.keys(geminiResponseObject.stateUpdates).length > 0) {
+                processAiStateUpdates(geminiResponseObject.stateUpdates, scenarioId, scenarioName, appData);
+            } else if (!geminiResponseObject.stateUpdates?.hasOwnProperty('MONITOR_PULSEOXIMETER_VISIBLE')) {
+                console.log("MAIN: No explicit PulseOx visibility from AI, opening by default for scenario:", scenarioId);
+                if (window.appShell && typeof window.appShell.addPulseOximeterTabForScenario === 'function') {
+                    window.appShell.addPulseOximeterTabForScenario(scenarioId, scenarioName);
+                }
+            }
         }
 
+        // --- Common logic for new and re-opened scenarios ---
         appData.playerData.activeScenarios = appData.playerData.activeScenarios || {};
         appData.playerData.activeScenarios[scenarioId] = {
             id: scenarioId, name: scenarioName, initialDescription: initialDescription,
             patientData: patientInfo, eventLog: scenarioEventLog, chatHistory: currentChatHistory,
-            startTimestamp: Date.now(), userRole: userProfession
+            startTimestamp: scenarioStartTimestamp,
+            isPaused: false, lastUpdatedTimestamp: Date.now(), userRole: userProfession
         };
-
         const patientTabId = `patient-info-${scenarioId}`;
         const patientTabLabel = `Patient: ${scenarioName.substring(0, 12)}${scenarioName.length > 12 ? '...' : ''}`;
         if (!globalTabConfigurations.find(t => t.id === patientTabId)) {
@@ -447,9 +636,8 @@ Ensure all requested sections (## Scenario Name, ## Initial Scene / Setting, ## 
         appData.playerData.activeScenarios[scenarioId] = {
             id: scenarioId, name: scenarioName, initialDescription: initialDescription,
             patientData: patientInfo, eventLog: scenarioEventLog, chatHistory: currentChatHistory,
-            startTimestamp: scenarioStartTimestamp,
-            elapsedSeconds: scenarioElapsedSeconds,
-            isPaused: scenarioIsPaused,
+            startTimestamp: Date.now(),
+            isPaused: false,
             lastUpdatedTimestamp: Date.now(), // Initialize for timer
             userRole: userProfession
         };
@@ -561,6 +749,95 @@ function parseGeminiScenarioData(responseText) {
     return { scenarioName, scenarioDescription, patientData };
 }
 
+// js/main.js
+
+// --- Helper Function for Processing AI State Updates ---
+/**
+ * Processes state updates received from Gemini.
+ * @param {Object} updates - The stateUpdates object from Gemini's response.
+ * @param {string} scenarioId - The ID of the current scenario.
+ * @param {string} scenarioName - The name of the current scenario (for new tab labels).
+ * @param {Object} currentAppData - The main appData object (to check existing states if needed).
+ */
+function processAiStateUpdates(updates, scenarioId, scenarioName, currentAppData) {
+    if (!updates || Object.keys(updates).length === 0) {
+        return; // No updates to process
+    }
+    console.log(`MAIN: Processing AI stateUpdates for scenario ${scenarioId}:`, updates);
+
+    const pulseOxTabId = `pulseox-monitor-${scenarioId}`;
+
+    // Pulse Oximeter Visibility
+    if (updates.hasOwnProperty('MONITOR_PULSEOXIMETER_VISIBLE')) {
+        if (updates.MONITOR_PULSEOXIMETER_VISIBLE === true) {
+            console.log("MAIN: AI requests PulseOx VISIBLE for scenario:", scenarioId);
+            if (window.appShell && typeof window.appShell.addPulseOximeterTabForScenario === 'function') {
+                window.appShell.addPulseOximeterTabForScenario(scenarioId, scenarioName); // scenarioName passed for new tab
+                // Optional: System message if it's not the initial scenario setup's action processing
+                // if (window.appShell.getActiveTabId() === scenarioId) { // Check if this is a subsequent update
+                //    ui.appendToScenarioLog(scenarioId, "System: Pulse oximeter display activated by AI.", false);
+                // }
+            }
+        } else if (updates.MONITOR_PULSEOXIMETER_VISIBLE === false) {
+            console.log("MAIN: AI requests PulseOx HIDDEN for scenario:", scenarioId);
+            if (window.appShell && typeof window.appShell.closeTab === 'function') {
+                window.appShell.closeTab(pulseOxTabId);
+                // if (window.appShell.getActiveTabId() === scenarioId) {
+                //    ui.appendToScenarioLog(scenarioId, "System: Pulse oximeter display deactivated by AI.", false);
+                // }
+            }
+        }
+    }
+
+    // Pulse Oximeter Vital Targets
+    const pulseOxTargets = {};
+    if (updates.hasOwnProperty('VITALS_HEARTRATE_TARGET')) {
+        pulseOxTargets.hr = parseFloat(updates.VITALS_HEARTRATE_TARGET);
+    }
+    if (updates.hasOwnProperty('VITALS_SPO2_TARGET')) {
+        pulseOxTargets.spo2 = parseFloat(updates.VITALS_SPO2_TARGET);
+    }
+
+    if (Object.keys(pulseOxTargets).length > 0) {
+        let hrDuration = updates.VITALS_HEARTRATE_DURATION; // Keep as string or number from AI
+        let spo2Duration = updates.VITALS_SPO2_DURATION;
+        let effectiveDuration = 0; // Default to instant
+
+        // Determine effective duration (can be more sophisticated if needed)
+        if (pulseOxTargets.hasOwnProperty('hr') && !isNaN(parseFloat(hrDuration)) && parseFloat(hrDuration) >= 0) {
+            effectiveDuration = parseFloat(hrDuration);
+        } else if (pulseOxTargets.hasOwnProperty('spo2') && !isNaN(parseFloat(spo2Duration)) && parseFloat(spo2Duration) >= 0) {
+            effectiveDuration = parseFloat(spo2Duration);
+        } else if (updates.hasOwnProperty('VITALS_DEFAULT_DURATION') && !isNaN(parseFloat(updates.VITALS_DEFAULT_DURATION))) {
+            effectiveDuration = parseFloat(updates.VITALS_DEFAULT_DURATION);
+        }
+        effectiveDuration = Math.max(0, effectiveDuration); // Ensure non-negative
+
+        console.log(`MAIN: AI Vitals for PulseOx ${scenarioId}:`, pulseOxTargets, "Duration:", effectiveDuration);
+        if (window.pulseOximeter && typeof window.pulseOximeter.setTargetVitals === 'function') {
+            window.pulseOximeter.setTargetVitals(scenarioId, pulseOxTargets, effectiveDuration);
+            // Optionally, log this change to the scenario's event log if it's a subsequent update
+            // if (window.appShell.getActiveTabId() === scenarioId) {
+            //     let vitalsMsg = "System: AI updated vitals - ";
+            //     if(pulseOxTargets.hr !== undefined) vitalsMsg += `HR target: ${pulseOxTargets.hr}. `;
+            //     if(pulseOxTargets.spo2 !== undefined) vitalsMsg += `SpO2 target: ${pulseOxTargets.spo2}. `;
+            //     vitalsMsg += `(Change over ${effectiveDuration}s).`;
+            //     ui.appendToScenarioLog(scenarioId, vitalsMsg, false);
+            // }
+        }
+    }
+    // TODO: Add processing for other monitors (NBP, Temp, ECG) here
+    // Example:
+    // if (updates.hasOwnProperty('VITALS_NBP_SYSTOLIC_TARGET')) {
+    //     const nbpData = { sys: parseFloat(updates.VITALS_NBP_SYSTOLIC_TARGET) };
+    //     if (updates.hasOwnProperty('VITALS_NBP_DIASTOLIC_TARGET')) {
+    //         nbpData.dia = parseFloat(updates.VITALS_NBP_DIASTOLIC_TARGET);
+    //     }
+    //     const nbpDuration = parseFloat(updates.VITALS_NBP_DURATION || 0);
+    //     window.nbpDisplay?.setNextReading(scenarioId, nbpData, nbpDuration); // Assuming nbpDisplay module
+    // }
+}
+// --- End Helper Function ---
 
 // --- Input Area Management ---
 const inputArea = document.getElementById('input-area');
@@ -568,9 +845,21 @@ const playerCommandInput = document.getElementById('player-command-input');
 const submitCommandBtn = document.getElementById('submit-command-btn');
 
 function showInputArea() {
-    if (inputArea) inputArea.classList.remove('hidden');
+    if (inputArea) {
+        const wasHidden = inputArea.classList.contains('hidden');
+        inputArea.classList.remove('hidden'); // Make it visible FIRST
+        if (wasHidden && typeof window.adjustMainContentHeight === 'function') {
+            // Call after a microtask delay to allow DOM to update from class removal
+            Promise.resolve().then(window.adjustMainContentHeight);
+            // requestAnimationFrame(window.adjustMainContentHeight); // Also a good option
+        } else if (typeof window.adjustMainContentHeight === 'function') {
+            // If it was already visible but something else changed, still good to call
+            Promise.resolve().then(window.adjustMainContentHeight);
+        }
+    }
     if (playerCommandInput) playerCommandInput.focus();
-    // When input area is shown due to a scenario, ensure footer timer is updated
+
+    // Update footer timer display logic (as before)
     if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
         const scenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
         if (scenario) ui.updateFooterTimerDisplay(scenario.elapsedSeconds, scenario.isPaused);
@@ -578,106 +867,90 @@ function showInputArea() {
     } else {
         ui.updateFooterTimerDisplay(null);
     }
+    console.log("MAIN: showInputArea called. Footer should be visible.");
 }
+
 function hideInputArea() {
-    if (inputArea) inputArea.classList.add('hidden');
-    ui.updateFooterTimerDisplay(null); // Hide timer when input area is hidden
+    if (inputArea) {
+        const wasVisible = !inputArea.classList.contains('hidden');
+        inputArea.classList.add('hidden'); // Hide it FIRST
+        if (wasVisible && typeof window.adjustMainContentHeight === 'function') {
+            Promise.resolve().then(window.adjustMainContentHeight);
+            // requestAnimationFrame(window.adjustMainContentHeight);
+        }
+    }
+    ui.updateFooterTimerDisplay(null);
+    console.log("MAIN: hideInputArea called. Footer should be hidden.");
 }
+
 
 if (submitCommandBtn && playerCommandInput) {
     submitCommandBtn.addEventListener('click', processPlayerCommand);
     playerCommandInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); processPlayerCommand(); } });
 }
+
 async function processPlayerCommand() {
-    const command = playerCommandInput.value.trim();
-    if (command && activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+    const originalCommand = playerCommandInput.value.trim();
+    if (originalCommand && activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
         const scenario = appData.playerData.activeScenarios[activeGlobalTabId];
         if (scenario && scenario.isPaused) {
             alert("Scenario is paused. Please resume to continue.");
-            playerCommandInput.value = command; // Put command back
+            playerCommandInput.value = originalCommand;
+            return;
+        }
+        if (!scenario) {
+            alert("Error: Active scenario data not found.");
             return;
         }
 
-        playerCommandInput.value = '';
-        // Include elapsed time in the context for the AI
-        const timeContext = `(Elapsed Scenario Time: ${formatTime(scenario.elapsedSeconds)})`;
-        const commandWithContext = `${command} ${timeContext}`;
+        playerCommandInput.value = ''; // Clear input
 
-        // Pass commandWithContext to game.handlePlayerCommand
-        // game.handlePlayerCommand will then pass it to gemini.ask
-        const modified = await game.handlePlayerCommand(command, commandWithContext, activeGlobalTabId, appData);
+        const timeContext = `(Elapsed Scenario Time: ${formatTime(scenario.elapsedSeconds)})`;
+
+        // --- PREPEND CONCISE SYSTEM INSTRUCTIONS TO THE USER'S COMMAND ---
+        const commandForGemini = `${CONCISE_GEMINI_SYSTEM_INSTRUCTIONS}\n\nPlayer says: "${originalCommand}"\n${timeContext}`;
+        // --- ---
+
+        // game.handlePlayerCommand will receive the originalCommand (for local parsing & logging)
+        // and commandForGemini (to be sent to the AI by gemini.ask)
+        const modified = await game.handlePlayerCommand(originalCommand, commandForGemini, activeGlobalTabId, appData);
         if (modified) {
             storage.saveAppData(appData);
         }
-    } else if (command) {
-        console.log("MAIN: Command entered but no active scenario tab:", command);
+    } else if (originalCommand) {
+        console.log("MAIN: Command entered but no active scenario tab:", originalCommand);
         playerCommandInput.value = '';
     }
-}
-
-// js/main.js
-function startGlobalGameTimer() {
-    if (gameTimerInterval) clearInterval(gameTimerInterval);
-    gameTimerInterval = setInterval(() => {
-        // console.log("MAIN: Timer Tick! Active Tab:", activeGlobalTabId); // Keep for debugging if needed
-        if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
-            const scenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
-            if (scenario && !scenario.isPaused) {
-                const now = Date.now();
-                // Calculate delta from lastUpdatedTimestamp
-                const deltaSeconds = Math.floor((now - scenario.lastUpdatedTimestamp) / 1000);
-
-                if (deltaSeconds > 0) {
-                    scenario.elapsedSeconds += deltaSeconds;
-                    scenario.lastUpdatedTimestamp = now; // CRITICAL: Update last timestamp
-                    // console.log(`MAIN: Scenario ${activeGlobalTabId} time: ${formatTime(scenario.elapsedSeconds)} (${scenario.elapsedSeconds}s)`);
-                }
-                ui.updateScenarioTimerDisplay(activeGlobalTabId, scenario.elapsedSeconds, scenario.isPaused);
-                ui.updateFooterTimerDisplay(scenario.elapsedSeconds, scenario.isPaused);
-            } else if (scenario && scenario.isPaused) {
-                // Ensure display shows paused state even if time isn't incrementing
-                ui.updateScenarioTimerDisplay(activeGlobalTabId, scenario.elapsedSeconds, true);
-                ui.updateFooterTimerDisplay(scenario.elapsedSeconds, true);
-            } else if (!scenario) {
-                console.warn("MAIN: Timer tick for scenario tab, but no scenario data found for:", activeGlobalTabId);
-                ui.updateFooterTimerDisplay(null);
-            }
-        } else {
-            ui.updateFooterTimerDisplay(null);
-        }
-    }, TIMER_UPDATE_INTERVAL_MS);
-    console.log("MAIN: Global scenario timer (re)started.");
 }
 
 
 function pauseScenarioTimer(scenarioId) {
     const scenario = appData.playerData.activeScenarios?.[scenarioId];
     if (scenario && !scenario.isPaused) {
-        const now = Date.now(); // Get current time for accurate last update
-        const deltaSeconds = Math.floor((now - scenario.lastUpdatedTimestamp) / 1000);
-        if (deltaSeconds >= 0) scenario.elapsedSeconds += deltaSeconds; // Add any remaining fraction of a second
-
+        // The animation loop will handle the final logic tick based on lastLogicUpdateTime
+        // We just need to set the state.
         scenario.isPaused = true;
-        scenario.lastUpdatedTimestamp = now; // Record time of pause
+        // lastUpdatedTimestamp will reflect the time of the last logic update done by animations.js
         storage.saveAppData(appData);
-        ui.updateScenarioTimerDisplay(scenarioId, scenario.elapsedSeconds, true);
-        if (scenarioId === activeGlobalTabId) ui.updateFooterTimerDisplay(scenario.elapsedSeconds, true);
-        console.log(`MAIN: Timer PAUSED for scenario ${scenarioId} at ${formatTime(scenario.elapsedSeconds)}`);
+        if (window.animations) window.animations.resetDisplayOptimizationFlags();
+        console.log(`MAIN: Scenario ${scenarioId} PAUSED at ${formatTime(scenario.elapsedSeconds)}`);
     }
 }
+
+
 
 function resumeScenarioTimer(scenarioId) {
     const scenario = appData.playerData.activeScenarios?.[scenarioId];
     if (scenario && scenario.isPaused) {
         scenario.isPaused = false;
-        scenario.lastUpdatedTimestamp = Date.now(); // CRITICAL: Reset for new interval calculations
+        const now = Date.now();
+        scenario.lastUpdatedTimestamp = now; // Reset for main elapsed time logic in animations.js
+        scenario.lastMonitorLogicUpdate = now; // Reset for monitor logic updates in animations.js
         storage.saveAppData(appData);
-        ui.updateScenarioTimerDisplay(scenarioId, scenario.elapsedSeconds, false);
-        if (scenarioId === activeGlobalTabId) ui.updateFooterTimerDisplay(scenario.elapsedSeconds, false);
-        console.log(`MAIN: Timer RESUMED for scenario ${scenarioId} at ${formatTime(scenario.elapsedSeconds)}`);
+        if (window.animations) window.animations.resetDisplayOptimizationFlags();
+        console.log(`MAIN: Scenario ${scenarioId} RESUMED at ${formatTime(scenario.elapsedSeconds)}`);
     }
 }
-
 function formatTime(totalSeconds) {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -687,6 +960,75 @@ function formatTime(totalSeconds) {
     timeString += `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     return timeString;
 }
+
+
+function addPulseOximeterTabForScenario(scenarioId, scenarioName) {
+    const pulseOxTabId = `pulseox-monitor-${scenarioId}`;
+    const safeScenarioName = scenarioName || "Scenario";
+    const pulseOxTabLabel = `PulseOx: ${safeScenarioName.substring(0, 10)}${safeScenarioName.length > 10 ? '...' : ''}`;
+
+    console.log(`MAIN_addPulseOxTab: Attempting for scenarioId: ${scenarioId}, tabId: ${pulseOxTabId}, label: ${pulseOxTabLabel}`);
+
+    if (globalTabConfigurations.find(t => t.id === pulseOxTabId)) {
+        console.log(`MAIN_addPulseOxTab: Tab ${pulseOxTabId} already exists. Switching or refreshing.`);
+        if (activeGlobalTabId !== pulseOxTabId) {
+            handleTabClick(pulseOxTabId); // Switch to it
+        } else {
+            // If already active, refresh its content. This relies on the contentGenerator being re-run.
+            // A more direct refresh might be needed if contentGenerator is complex.
+            // For now, handleTabClick -> updateGlobalTabsAndContent -> renderActiveTabContent will re-run the generator.
+            renderActiveTabContent(); // Re-render the current (already active) tab
+        }
+        return; // Exit because tab already exists
+    }
+
+    console.log(`MAIN_addPulseOxTab: Calling addGlobalTab for ${pulseOxTabId}`);
+    addGlobalTab( // This calls the generic addGlobalTab
+        pulseOxTabId,
+        pulseOxTabLabel,
+        true,  // isCloseable
+        true,  // switchToNewTab - IMPORTANT! Set this to TRUE if you want it to become active
+        (currentAppData) => { // contentGenerator for the pulse oximeter tab
+            console.log(`MAIN_addPulseOxTab: ContentGenerator executing for ${pulseOxTabId}`);
+            const panelWrapper = document.createElement('div');
+            panelWrapper.innerHTML = `<div class="in-tab-loading"><div class="spinner"></div><p>Loading Pulse Oximeter...</p></div>`;
+
+            if (!window.ui || typeof window.ui.fetchHtmlTemplate !== 'function') {
+                console.error("MAIN_addPulseOxTab (ContentGen): ui.fetchHtmlTemplate not available!");
+                panelWrapper.innerHTML = "<p class='error-message'>Error: Core UI functions missing for monitor.</p>";
+                return panelWrapper;
+            }
+
+            window.ui.fetchHtmlTemplate('components/monitors/pulseOximeter/pulseOximeter.html')
+                .then(htmlString => {
+                    console.log(`MAIN_addPulseOxTab (ContentGen): HTML fetched for ${pulseOxTabId}. Injecting.`);
+                    if (htmlString.toLowerCase().includes("error loading ui component")) {
+                        panelWrapper.innerHTML = htmlString; return;
+                    }
+                    if (!window.ui || typeof window.ui.injectHtmlWithPlaceholders !== 'function') { /* error */ return; }
+
+                    window.ui.injectHtmlWithPlaceholders(panelWrapper, htmlString, { "{{SCENARIO_ID}}": scenarioId });
+
+                    if (window.pulseOximeter && typeof window.pulseOximeter.initInstance === 'function') {
+                        const scData = currentAppData.playerData.activeScenarios[scenarioId];
+                        // Use the VITAL values Gemini JUST provided if available in stateUpdates, otherwise defaults
+                        const latestUpdates = window.appShell?.getLastAiStateUpdates?.() || {}; // Need a way to get latest AI updates if needed here
+
+                        const initialSpo2 = latestUpdates.VITALS_SPO2_TARGET !== undefined ? latestUpdates.VITALS_SPO2_TARGET :
+                            (scData?.patientData?.vitals?.spo2 ?? (scData?.vitals?.spo2 !== undefined ? scData.vitals.spo2 : 98));
+                        const initialHr = latestUpdates.VITALS_HEARTRATE_TARGET !== undefined ? latestUpdates.VITALS_HEARTRATE_TARGET :
+                            (scData?.patientData?.vitals?.hr ?? (scData?.vitals?.hr !== undefined ? scData.vitals.hr : 70));
+
+                        console.log(`MAIN_addPulseOxTab (ContentGen): Initializing pulseOximeter JS for ${scenarioId} with SpO2: ${initialSpo2}, HR: ${initialHr}`);
+                        window.pulseOximeter.initInstance(scenarioId, initialSpo2, initialHr);
+                    } else { /* error */ }
+                })
+                .catch(error => { /* error handling */ });
+            return panelWrapper;
+        }
+    );
+}
+
 // --- Global Event Listeners & Game Start ---
 document.addEventListener('DOMContentLoaded', initializeGame);
 window.addEventListener('hashchange', () => {
@@ -698,6 +1040,8 @@ window.addEventListener('hashchange', () => {
     }
 });
 
+let lastProcessedAiStateUpdates = {};
+
 // IMPORTANT: window.appShell MUST be defined AFTER all functions it references are defined.
 window.appShell = {
     addGlobalTab,
@@ -708,35 +1052,50 @@ window.appShell = {
     saveGameData: () => storage.saveAppData(appData),
     refreshCurrentTabContent: () => { if (activeGlobalTabId) renderActiveTabContent(); },
     refreshTabContent: (tabId) => {
-        const tabConfig = globalTabConfigurations.find(tab => tab.id === tabId);
+        const tabConfig = globalTabConfigurations.find(t => t.id === tabId);
         if (tabConfig && tabConfig.contentGenerator) {
-            ui.renderTabPanelContent(tabId, tabConfig.contentGenerator(appData));
+            if (window.ui) ui.renderTabPanelContent(tabId, tabConfig.contentGenerator(appData));
         } else if (tabConfig) {
-            renderActiveTabContent(); // Fallback, maybe more specific logic if no generator
+            renderActiveTabContent();
         }
     },
     handleStartNewGame: handleStartNewScenarioRequest,
-    disableStartGameButton: (disable) => {
-        const startBtn = document.getElementById('home-start-new-game');
+    disableStartGameButton: (disable, buttonText = "Start New Scenario") => {
+        const startBtn = document.getElementById('home-start-new-game-btn'); // Corrected ID
         if (startBtn) {
             startBtn.disabled = disable;
-            startBtn.textContent = disable ? "Generating..." : "Start New Scenario"; // Changed text
+            startBtn.textContent = disable ? (buttonText === "Start New Scenario" ? "Generating..." : buttonText) : "Generate Scenario";
             startBtn.style.cursor = disable ? 'not-allowed' : 'pointer';
             startBtn.style.opacity = disable ? '0.7' : '1';
         }
     },
     getRecentlyClosedScenarios: () => appData.playerData.recentlyClosedScenarios || [],
     reopenClosedScenario: handleReopenScenarioRequest,
-
-    pauseActiveScenarioTimer: () => {
-        if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
-            pauseScenarioTimer(activeGlobalTabId);
-        }
-    },
-    resumeActiveScenarioTimer: () => {
-        if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
-            resumeScenarioTimer(activeGlobalTabId);
-        }
-    }
+    processAiStateUpdates, // Expose the helper
+    addPulseOximeterTabForScenario, // Expose this
+    closeTab: function (tabIdToClose) { /* ... as before ... */ },
+    pauseActiveScenarioTimer: () => { if (activeGlobalTabId?.startsWith('scenario-')) pauseScenarioTimer(activeGlobalTabId); },
+    resumeActiveScenarioTimer: () => { if (activeGlobalTabId?.startsWith('scenario-')) resumeScenarioTimer(activeGlobalTabId); },
+    getOpenTabIds: () => globalTabConfigurations.map(t => t.id) // Ensure this is here
 };
 
+window.addEventListener('beforeunload', (event) => {
+    console.log("MAIN: beforeunload event triggered. Performing IMMEDIATE save.");
+    if (appDataSaveTimeoutId) { // If a debounced save was pending, clear it
+        clearTimeout(appDataSaveTimeoutId);
+        appDataSaveTimeoutId = null;
+    }
+    // Update elapsed time for the active scenario one last time
+    if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+        const scenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
+        if (scenario && !scenario.isPaused) {
+            const now = Date.now();
+            const deltaSeconds = Math.floor((now - scenario.lastUpdatedTimestamp) / 1000);
+            if (deltaSeconds >= 0) {
+                scenario.elapsedSeconds += deltaSeconds;
+            }
+        }
+    }
+    storage.saveAppData(appData); // Immediate save
+    console.log("MAIN: appData saved on beforeunload.");
+});

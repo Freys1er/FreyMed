@@ -1,13 +1,28 @@
 /* css/layout.css */
+html,
+body {
+    /* ... */
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* This on body is key to preventing outer scroll */
+}
 
 /* --- Main Game Interface Container --- */
 #game-interface {
     flex-grow: 1;
+    /* Takes all available space in 'body' */
     display: flex;
     flex-direction: column;
-    height: 100%;
+    /* height: 100%; NO LONGER NEEDED if body is flex and this is flex-grow: 1 */
     width: 100%;
-    /* Background color in theme.css */
+    background-color: #000000;
+    /* From theme.css */
+    position: relative;
+    /* Good for containing absolute children if any */
+    overflow: hidden;
+    /* Prevent #game-interface itself from scrolling its direct children (header/main/footer) */
 }
 
 /* --- Header Styling --- */
@@ -18,10 +33,12 @@
     display: flex;
     align-items: center;
     /* border-bottom in theme.css */
-    height: 30px; /* Fixed height for the header */
+    height: 35px;
+    /* Fixed height for the header */
     box-sizing: border-box;
     z-index: 10;
-    overflow: hidden; /* Prevents any overflow within the header */
+    overflow: hidden;
+    /* Prevents any overflow within the header */
 }
 
 /* Logo/Title area (if you add one separate from tabs) */
@@ -33,45 +50,58 @@
     flex-grow: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 15px; /* Default padding for content panels */
+    padding: 15px;
+    /* Default padding for content panels */
     box-sizing: border-box;
     /* background-color in theme.css */
-    border-radius: 0px; /* Changed from 8px to 0 for sharper panel look */
-    margin: 0px;      /* Changed from 10px to 0 */
+    border-radius: 0px;
+    /* Changed from 8px to 0 for sharper panel look */
+    margin: 0px;
+    /* Changed from 10px to 0 */
     /* box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Removed shadow */
-    position: relative; /* For potential absolute positioning of children */
+    position: relative;
+    /* For potential absolute positioning of children */
 }
 
 /* --- Footer Input Area --- */
 #input-area {
     flex-shrink: 0;
     /* background-color in theme.css */
-    padding: 5px 8px; /* Adjusted padding */
+    padding: 5px 8px;
+    /* Adjusted padding */
     /* border-top in theme.css */
     display: flex;
     gap: 8px;
     align-items: center;
     z-index: 10;
-    height: 42px; /* Defined height for consistency */
+    height: 42px;
+    /* Defined height for consistency */
     box-sizing: border-box;
 }
 
 .footer-timer {
-    font-size: 1.5em; /* Make it noticeable */
+    font-size: 1.5em;
+    /* Make it noticeable */
     font-weight: bold;
-    color: #FF0000; /* Tomato red for stress, or your accent color */
-    margin: 15px 15px 15px 0px; /* Space before the input field */
-    padding: 0px 15px 0px 15px;
-    background-color: #101010; /* Slightly different background */
+    color: #FF0000;
+    /* Tomato red for stress, or your accent color */
+    margin: 15px 0px 15px 0px;
+    /* Space before the input field */
+    padding: 0px 45px 0px 15px;
+    background-color: #101010;
+    /* Slightly different background */
     border-radius: 1000px;
     border: 1px solid #000000;
-    min-width: 70px; /* Ensure it has some width even at 00:00 */
+    min-width: 70px;
+    /* Ensure it has some width even at 00:00 */
     text-align: center;
-    font-family: 'Courier New', Courier, monospace; /* Monospace for timer look */
+    font-family: 'Courier New', Courier, monospace;
+    /* Monospace for timer look */
 }
 
 /* General panel class that might be used by tab-panel content */
-.panel-content-wrapper { /* You might wrap tab panel content in this for consistent padding */
+.panel-content-wrapper {
+    /* You might wrap tab panel content in this for consistent padding */
     padding: 15px;
     box-sizing: border-box;
     height: 100%;

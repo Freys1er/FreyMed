@@ -4,23 +4,62 @@ const ui = {
     FONT_CLASSES: ['font-normal', 'font-monospace', 'font-handwriting'],
     _globalTabBar: null,
     _mainContentArea: null,
+    _footerTimerDisplay: null, // Added from timer logic
 
     getGlobalTabBar: function () {
-        if (!this._globalTabBar) this._globalTabBar = document.getElementById('global-tab-bar');
+        if (!this._globalTabBar) {
+            this._globalTabBar = document.getElementById('global-tab-bar');
+            console.log("UI: getGlobalTabBar - Fetched #global-tab-bar element:", this._globalTabBar); // Log when fetched
+        }
+        if (!this._globalTabBar) {
+            console.error("UI: CRITICAL - #global-tab-bar element is NULL even after getElementById!");
+        }
         return this._globalTabBar;
     },
     getMainContentArea: function () {
         if (!this._mainContentArea) this._mainContentArea = document.getElementById('main-content-area');
         return this._mainContentArea;
     },
+    getFooterTimerDisplay: function () { // Added from timer logic
+        if (!this._footerTimerDisplay) this._footerTimerDisplay = document.getElementById('global-scenario-timer-display');
+        return this._footerTimerDisplay;
+    },
+
+    fetchHtmlTemplate: async function (templateUrl) {
+        console.log(`UI: Fetching template: ${templateUrl}`);
+        try {
+            const response = await fetch(templateUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch template ${templateUrl}. Status: ${response.status} ${response.statusText}`);
+            }
+            const htmlString = await response.text();
+            console.log(`UI: Template '${templateUrl}' fetched successfully.`);
+            return htmlString;
+        } catch (error) {
+            console.error(`UI Error: Could not fetch HTML template '${templateUrl}':`, error);
+            return `<p class="error-message">Error loading UI component: ${error.message}</p>`;
+        }
+    },
+
+    injectHtmlWithPlaceholders: function (targetElement, htmlString, placeholders = {}) {
+        let processedHtml = htmlString;
+        for (const key in placeholders) {
+            const placeholderPattern = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'); // Escape special regex chars
+            const regex = new RegExp(placeholderPattern, 'g');
+            processedHtml = processedHtml.replace(regex, placeholders[key]);
+        }
+        targetElement.innerHTML = processedHtml;
+        console.log("UI: HTML injected with placeholders. Target:", targetElement, "Placeholders used:", placeholders);
+    },
 
     applyFontPreference: function (fontPreference) {
+        console.log("UI_LOG: Applying font preference:", fontPreference);
         document.body.classList.remove(...this.FONT_CLASSES);
         const fontClass = `font-${fontPreference || 'normal'}`;
         if (this.FONT_CLASSES.includes(fontClass)) {
             document.body.classList.add(fontClass);
         } else {
-            document.body.classList.add('font-normal'); // Fallback
+            document.body.classList.add('font-normal');
         }
     },
 
@@ -233,11 +272,12 @@ const ui = {
         });
     },
     renderTabPanelContent: function (tabId, contentData) {
+        // This function is now simpler. It expects contentData to be either:
+        // 1. An HTMLElement (already constructed by a component's JS)
+        // 2. A string of HTML (less common now, but possible for very simple tabs)
+        // 3. An object like { templateUrl: 'path/to/template.html', placeholders: {...}, onLoaded: (panelElement) => {} }
         const contentArea = this.getMainContentArea();
-        if (!contentArea) {
-            console.error("UI Error: Main content area element not found in renderTabPanelContent.");
-            return;
-        }
+        if (!contentArea) { /* ... error ... */ return; }
         contentArea.querySelectorAll('.tab-panel.active').forEach(p => p.classList.remove('active'));
         let panel = contentArea.querySelector(`.tab-panel[data-tab-id="${tabId}"]`);
         if (!panel) {
@@ -246,10 +286,27 @@ const ui = {
             panel.dataset.tabId = tabId;
             contentArea.appendChild(panel);
         }
-        if (typeof contentData === 'string') panel.innerHTML = contentData;
-        else if (contentData instanceof HTMLElement) {
+
+        if (typeof contentData === 'string') {
+            panel.innerHTML = contentData;
+        } else if (contentData instanceof HTMLElement) {
             panel.innerHTML = ''; panel.appendChild(contentData);
-        } else panel.innerHTML = `<h2>Content for ${tabId}</h2><p>Error: Invalid content data.</p>`;
+        } else if (typeof contentData === 'object' && contentData.templateUrl) {
+            // Handle template loading
+            panel.innerHTML = `<div class="in-tab-loading"><div class="spinner"></div><p>Loading content...</p></div>`; // Initial loading state
+            this.fetchHtmlTemplate(contentData.templateUrl)
+                .then(htmlString => {
+                    this.injectHtmlWithPlaceholders(panel, htmlString, contentData.placeholders || {});
+                    if (typeof contentData.onLoaded === 'function') {
+                        contentData.onLoaded(panel); // Pass the panel so component JS can find its elements
+                    }
+                })
+                .catch(err => {
+                    panel.innerHTML = `<p class="error-message">Failed to load tab content: ${err.message}</p>`;
+                });
+        } else {
+            panel.innerHTML = `<h2>Content for ${tabId}</h2><p>Error: Invalid or no content data provided.</p>`;
+        }
         panel.classList.add('active');
     },
 
@@ -359,3 +416,7 @@ const ui = {
         return timeString;
     }
 };
+
+window.ui = ui;
+console.log("UI_LOG: 'ui' object assigned to window.ui. Checking window.ui.fetchHtmlTemplate:", typeof window.ui?.fetchHtmlTemplate);
+console.log("UI_LOG: ui.js script parsing finished.");

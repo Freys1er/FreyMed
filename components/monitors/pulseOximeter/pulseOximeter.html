@@ -1,0 +1,21 @@
+<!-- components/monitors/pulseOximeter/pulseOximeter.html -->
+<div class="monitor-panel pulse-oximeter-panel"> <!-- Root class for CSS -->
+    <h2>Pulse Oximeter & Heart Rate</h2>
+    <div class="monitor-grid">
+        <div class="monitor-channel pleth-channel">
+            <div class="waveform-title">Plethysmograph (SpO2 Wave)</div>
+            <!-- IMPORTANT: Use placeholders for dynamic IDs -->
+            <canvas id="pleth-canvas-{{SCENARIO_ID}}" class="monitor-canvas pleth-wave-canvas"></canvas>
+            <div class="vital-value spo2-value">SpO<sub>2</sub>: <span id="spo2-display-{{SCENARIO_ID}}">--</span>%</div>
+        </div>
+        <div class="monitor-channel hr-channel">
+            <div class="waveform-title">Heart Rate (from Pleth)</div>
+            <div class="vital-value large-vital hr-value">HR: <span id="hr-from-spo2-display-{{SCENARIO_ID}}">--</span> bpm</div>
+            <p class="small-text">Note: Heart rate derived from pulse oximetry.</p>
+        </div>
+    </div>
+    <div class="monitor-controls">
+        <button class="data-section-button" id="pulseox-pause-resume-btn-{{SCENARIO_ID}}">Pause Display</button>
+        <!-- Add more controls if needed -->
+    </div>
+</div>
