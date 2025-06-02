@@ -1,0 +1,24 @@
+<!-- components/monitorsScreen/monitorsScreen.html -->
+<div class="monitors-screen-content">
+    <h2>Patient Monitors - Scenario: <span id="monitors-screen-scenario-name">N/A</span></h2>
+    <div class="monitor-layout-container" id="monitor-layout-container-{{SCENARIO_ID}}">
+        <!-- Individual monitor snippets will be injected here by monitorsScreen.js -->
+        <!-- Example structure for stacking: -->
+        <div id="pulseox-slot-{{SCENARIO_ID}}" class="monitor-slot" style="display: none;">
+            <!-- Pulse oximeter HTML will be loaded here -->
+        </div>
+        <div id="ecg-slot-{{SCENARIO_ID}}" class="monitor-slot" style="display: none;">
+            <!-- ECG Display HTML will be loaded here -->
+        </div>
+        <div id="nbp-slot-{{SCENARIO_ID}}" class="monitor-slot" style="display: none;">
+            <!-- NBP Display HTML will be loaded here -->
+        </div>
+        <!-- Add more slots as needed -->
+    </div>
+    <div class="monitors-screen-controls">
+        <p>Toggle Monitors:</p>
+        <button class="data-section-button" data-monitor-type="pulseOximeter">PulseOx</button>
+        <button class="data-section-button" data-monitor-type="ecgDisplay">ECG</button>
+        <button class="data-section-button" data-monitor-type="nbpDisplay">NBP</button>
+    </div>
+</div>

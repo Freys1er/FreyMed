@@ -1,0 +1,121 @@
+/* components/monitorsScreen/monitorsScreen.css */
+.monitors-screen-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 10px;
+    /* Padding for the whole screen */
+    box-sizing: border-box;
+}
+
+.monitors-screen-content h2 {
+    text-align: center;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+}
+
+.monitor-layout-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    /* Stack monitors vertically by default */
+    /* Or use flex-direction: row; flex-wrap: wrap; for a grid-like flow */
+    gap: 10px;
+    /* Space between monitor widgets */
+    overflow-y: auto;
+    /* Scroll if too many monitors */
+    padding: 5px;
+    background-color: #080808;
+    /* Slightly different background for the container */
+    border-radius: 3px;
+}
+
+.monitor-slot {
+    /* Styles for the containers of individual monitors, if needed beyond .monitor-widget */
+    /* e.g., border: 1px dashed #333; */
+}
+
+/* Individual monitor widgets (general styling) */
+.monitor-widget {
+    background-color: #000000;
+    /* Each monitor black by default */
+    border: 1px solid #222;
+    border-radius: 4px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 120px;
+    /* Example minimum height */
+}
+
+.monitor-widget-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8em;
+    color: #888;
+    padding-bottom: 4px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #2a2a2a;
+    text-transform: uppercase;
+}
+
+.monitor-widget-header .widget-pause-btn {
+    background: none;
+    border: 1px solid #444;
+    color: #777;
+    padding: 2px 5px;
+    font-size: 0.9em;
+    border-radius: 3px;
+}
+
+.monitor-widget-body {
+    flex-grow: 1;
+    /* Contains canvas and vital readouts */
+}
+
+.monitor-widget .monitor-canvas {
+    /* General for all canvases in widgets */
+    display: block;
+    width: 100%;
+    height: 50px;
+    /* Default, can be overridden by specific monitor CSS */
+    background-color: #000;
+    margin-bottom: 5px;
+}
+
+.monitor-widget .vital-readouts {
+    display: flex;
+    justify-content: space-around;
+    /* Example layout for multiple readouts */
+    font-size: 0.9em;
+}
+
+.monitor-widget .vital-value {
+    font-size: 1.5em;
+    /* Smaller default if multiple monitors */
+}
+
+.monitor-widget .large-vital {
+    font-size: 2em;
+}
+
+/* If one vital is emphasized */
+
+
+.monitors-screen-controls {
+    flex-shrink: 0;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid #2a2a2a;
+    text-align: center;
+}
+
+.monitors-screen-controls p {
+    margin-bottom: 5px;
+    font-size: 0.9em;
+}
+
+.monitors-screen-controls .data-section-button {
+    margin: 0 5px;
+}

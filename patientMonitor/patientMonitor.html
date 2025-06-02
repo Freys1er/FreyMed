@@ -1,0 +1,99 @@
+<!-- patientMonitor/patientMonitor.html -->
+<div class="patient-monitor-widget" id="pm-widget-{{SCENARIO_ID}}">
+    <div class="monitor-header-info">
+        <span id="pm-patient-id-{{SCENARIO_ID}}">PATIENT: 5QXVT</span> <!-- Example ID -->
+        <span id="pm-current-time-{{SCENARIO_ID}}" class="monitor-current-time">00:00:00 AM</span>
+    </div>
+
+    <div class="monitor-main-grid">
+        <!-- ECG Channel -->
+        <div class="monitor-channel ecg-channel">
+            <div class="waveform-area">
+                <canvas id="pm-ecg-canvas-{{SCENARIO_ID}}" class="monitor-canvas ecg-wave"></canvas>
+                <span class="waveform-label ecg-label">II</span> <!-- Lead II typically -->
+                 <span class="ecg-rhythm-text" id="pm-ecg-rhythm-{{SCENARIO_ID}}">Sinus Rhythm</span>
+            </div>
+            <div class="numeric-area hr-numeric">
+                <span class="vital-label">HR</span>
+                <span class="vital-value" id="pm-hr-value-{{SCENARIO_ID}}">---</span>
+                <span class="vital-unit">bpm</span>
+                <!-- <div class="alarm-limits">75-160</div> -->
+            </div>
+        </div>
+
+        <!-- SpO2/Pleth Channel -->
+        <div class="monitor-channel spo2-channel">
+            <div class="waveform-area">
+                <canvas id="pm-pleth-canvas-{{SCENARIO_ID}}" class="monitor-canvas pleth-wave"></canvas>
+                <span class="waveform-label spo2-label">Pleth</span>
+            </div>
+            <div class="numeric-area spo2-numeric">
+                <span class="vital-label">SpO<sub>2</sub></span>
+                <span class="vital-value" id="pm-spo2-value-{{SCENARIO_ID}}">---</span>
+                <span class="vital-unit">%</span>
+                <!-- <div class="alarm-limits">90-100</div> -->
+            </div>
+        </div>
+
+        <!-- ABP (Arterial Blood Pressure) Channel - if invasive -->
+        <!-- Or NBP (Non-Invasive Blood Pressure) - if non-invasive like image -->
+        <div class="monitor-channel abp-channel"> <!-- Assuming ABP from image -->
+            <div class="waveform-area">
+                <canvas id="pm-abp-canvas-{{SCENARIO_ID}}" class="monitor-canvas abp-wave"></canvas>
+                <span class="waveform-label abp-label">ART</span>
+            </div>
+            <div class="numeric-area abp-numeric">
+                <span class="vital-label">ABP</span>
+                <span class="vital-value" id="pm-abp-value-{{SCENARIO_ID}}">--/--</span>
+                <span class="vital-unit">mmHg</span>
+                <span class="map-value">(MAP: <span id="pm-map-value-{{SCENARIO_ID}}">--</span>)</span>
+            </div>
+        </div>
+        
+        <!-- NBP Display Area (if image also implies NBP besides ABP waveform) -->
+        <div class="monitor-channel nbp-channel-numeric-only">
+             <div class="numeric-area nbp-numeric-display">
+                <span class="vital-label">NBP</span>
+                <span class="vital-value large-nbp" id="pm-nbp-value-{{SCENARIO_ID}}">---/---</span>
+                <span class="vital-unit nbp-unit">(<span id="pm-nbp-map-{{SCENARIO_ID}}">--</span>) mmHg</span>
+                <div class="nbp-time" id="pm-nbp-time-{{SCENARIO_ID}}">@ --:--</div>
+                <!-- NBP history could be a sub-panel or not shown initially -->
+            </div>
+        </div>
+
+
+        <!-- EtCO2 (End-Tidal CO2) / Capnography Channel -->
+        <div class="monitor-channel etco2-channel">
+            <div class="waveform-area">
+                <canvas id="pm-etco2-canvas-{{SCENARIO_ID}}" class="monitor-canvas etco2-wave"></canvas>
+                <span class="waveform-label etco2-label">CO<sub>2</sub></span>
+            </div>
+            <div class="numeric-area etco2-numeric">
+                <span class="vital-label">etCO<sub>2</sub></span>
+                <span class="vital-value" id="pm-etco2-value-{{SCENARIO_ID}}">--.-</span>
+                <span class="vital-unit" id="pm-etco2-unit-{{SCENARIO_ID}}">mmHg</span> <!-- Or kPa -->
+                <div class="vital-sub-numeric">
+                    <span class="vital-label sub-label">RR</span> <!-- Respiratory Rate from EtCO2 -->
+                    <span class="vital-value sub-value" id="pm-rr-value-{{SCENARIO_ID}}">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Placeholder for other parameters like Temperature if needed -->
+        <div class="monitor-channel temp-channel-numeric-only">
+            <div class="numeric-area temp-numeric-display">
+                <span class="vital-label">Temp</span>
+                <span class="vital-value" id="pm-temp-value-{{SCENARIO_ID}}">--.-</span>
+                <span class="vital-unit">°C</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="monitor-footer-controls" id="pm-footer-controls-{{SCENARIO_ID}}">
+        <button class="monitor-button" data-action="defib-panel">Defib Panel</button>
+        <button class="monitor-button" data-action="start-nibp">Start NIBP</button>
+        <button class="monitor-button" data-action="set-alarms">Set Alarms</button>
+        <button class="monitor-button" data-action="mute-alarms" id="pm-mute-alarms-btn-{{SCENARIO_ID}}">Mute Alarms</button>
+        <button class="monitor-button" data-action="monitor-pause-resume" id="pm-pause-resume-all-btn-{{SCENARIO_ID}}">Pause All</button>
+    </div>
+</div>

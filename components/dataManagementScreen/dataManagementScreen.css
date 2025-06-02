@@ -1,25 +1,71 @@
-/* css/notes-panel.css */
+/* components/dataManagementScreen/dataManagementScreen.css (or merge into css/data-panel.css) */
 
-.notes-panel { /* Wrapper div created by game.js for notes content */
-    display: flex; /* Allow textarea to grow */
-    flex-direction: column;
-    height: 100%;
-    /* Padding applied by #main-content-area or .panel-content-wrapper */
+.data-management-panel-content {
+    /* Padding applied by #main-content-area or .panel-content-wrapper in layout.css */
 }
 
-/* .notes-panel h2 already covered by general .tab-panel h2 in theme.css */
+.data-management-panel-content h2 {
+    /* Uses global h2 styles from theme.css or base.css */
+    margin-bottom: 25px;
+}
 
-.notes-panel textarea {
-    flex-grow: 1; /* Make textarea fill available space after h2 */
-    width: 100%; /* Fill width of parent */
-    min-height: 200px; /* Ensure it's usable even if parent is small */
-    background-color: #080808; /* Very dark for text editing */
-    color: #a0a0a0;
+.data-section { /* This style is likely already in your global components.css or theme.css */
+    margin-bottom: 25px;
+    padding: 20px;
+    background-color: #101010;
     border: 1px solid #000000;
-    padding: 12px; /* More padding */
-    border-radius: 3px;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
-    /* font-family, font-size, line-height inherited or from components.css */
-    box-sizing: border-box; /* Important */
+    border-radius: 4px;
 }
-/* Focus state from components.css */
+
+.data-section h3 {
+    /* Uses global h3 styles */
+    margin-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.data-section label,
+.form-label { /* If you used .form-label elsewhere */
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: #b0b0b0;
+    font-size: 0.9em;
+}
+
+.api-key-status {
+    font-style: normal;
+    color: #888888;
+    margin-bottom: 10px;
+    font-size: 0.85em;
+}
+
+.api-key-note {
+    font-size: 0.8em;
+    color: #777;
+    margin-top: 10px;
+}
+
+.dms-input, /* Specific inputs for this screen if needed */
+.dms-select { /* Specific selects */
+    /* Inherits from global input/select styles in components.css */
+    /* Add overrides here if necessary */
+    width: calc(100% - 22px); /* Standard width adjustment */
+    box-sizing: border-box;
+}
+
+.font-selector-section {
+    /* Specific styling for the font selector container if needed */
+}
+
+.data-section button.data-section-button { /* Ensure buttons in data-section are styled */
+    /* Inherits from global button styles in components.css */
+    margin-right: 10px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+}
+.data-section button.data-section-button:last-of-type {
+    margin-right: 0;
+}

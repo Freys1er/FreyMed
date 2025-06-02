@@ -16,6 +16,8 @@ let globalTabConfigurations = []; // This will be populated by initializeGame
 // - game.getScenarioPlayScreenContent (defined in game.js)
 // - window.animations.startAnimationLoop (defined in animations.js)
 // - startGlobalGameTimerLogic (defined in main.js)
+// js/main.js (near the top)
+let currentMonitorsScreenInstance = null;
 
 function initializeGame() {
     console.log("MAIN: Initializing game...");
@@ -48,17 +50,24 @@ function initializeGame() {
                 window.appShell?.reopenClosedScenario
             ) || Promise.resolve(document.createTextNode("Home Screen Error: Module not fully loaded."))
         },
-        {
+        { // MODIFIED FOR DATA MANAGEMENT SCREEN
             id: 'data',
             label: 'Data & Settings',
             isCloseable: false,
-            contentGenerator: (currentAppData) => typeof ui !== 'undefined' ? ui.createDataManagementPanel?.(
-                currentAppData,
-                window.appShell?.handleApiKeyChange, // These will be assigned to appShell later
-                window.appShell?.handleFontPreferenceChange,
-                window.appShell?.handleImportRequest,
-                window.appShell?.handleExportRequest
-            ) : document.createTextNode("Data Screen Error: UI Module not fully loaded.")
+            contentGenerator: (currentAppData) => { // This now returns a Promise
+                if (window.dataManagementScreen && typeof window.dataManagementScreen.getContentElement === 'function') {
+                    return window.dataManagementScreen.getContentElement(
+                        currentAppData, // Pass full appData
+                        window.appShell.handleApiKeyChange, // Pass callbacks from appShell
+                        window.appShell.handleFontPreferenceChange,
+                        window.appShell.handleImportRequest,
+                        window.appShell.handleExportRequest
+                    );
+                } else {
+                    console.error("MAIN: dataManagementScreen.getContentElement not found!");
+                    return Promise.resolve(document.createTextNode("Error: Data/Settings module failed to load."));
+                }
+            }
         },
         {
             id: 'notes',
@@ -71,6 +80,56 @@ function initializeGame() {
                     storage.saveAppData(currentAppData);
                 }
             ) || Promise.resolve(document.createTextNode("Notes Screen Error: Module not fully loaded."))
+        },
+        { // MONITORS TAB CONFIGURATION
+            id: 'monitors-main',
+            label: 'Patient Monitors',
+            isCloseable: true, // Or false, depending on your preference
+            contentGenerator: (currentAppData) => { // This function is key
+                console.log("MAIN: Monitors Tab contentGenerator CALLED.");
+                let activeScenarioForMonitorsId = null;
+
+                // Determine which scenario's monitors to show.
+                // Priority: 1. Globally active scenario tab. 2. First active scenario found.
+                if (window.appShell && activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+                    activeScenarioForMonitorsId = activeGlobalTabId;
+                } else if (currentAppData.playerData && currentAppData.playerData.activeScenarios) {
+                    // Find the first scenario ID that has data in activeScenarios
+                    // This is a fallback if no main scenario tab is currently "active" in the UI
+                    // but monitors tab is clicked.
+                    activeScenarioForMonitorsId = Object.keys(currentAppData.playerData.activeScenarios).find(
+                        id => currentAppData.playerData.activeScenarios[id]
+                    );
+                }
+
+                console.log("MAIN: Monitors Tab - Determined scenarioId for monitors:", activeScenarioForMonitorsId);
+
+                if (activeScenarioForMonitorsId && currentAppData.playerData.activeScenarios[activeScenarioForMonitorsId]) {
+                    const scenarioData = currentAppData.playerData.activeScenarios[activeScenarioForMonitorsId];
+                    if (window.monitorsScreen && typeof window.monitorsScreen.getContentElement === 'function') {
+                        console.log("MAIN: Monitors Tab - Calling monitorsScreen.getContentElement for scenario:", scenarioData.id);
+                        // Pass initial visibility states from appData for this scenario
+                        const initialMonitorVisibilityStates = scenarioData.visibleMonitors || {};
+                        // currentMonitorsScreenInstance might be set here or inside getContentElement if it's a singleton-like pattern
+                        // For now, assume getContentElement creates/returns the element and might set currentMonitorsScreenInstance itself
+                        return window.monitorsScreen.getContentElement(scenarioData.id, scenarioData.name, initialMonitorVisibilityStates); // This returns a Promise<HTMLElement>
+                    } else {
+                        console.error("MAIN: Monitors Tab - window.monitorsScreen.getContentElement not found!");
+                        return Promise.resolve(document.createTextNode("Error: Monitors screen module failed to load.")); // Return a promise resolving to an element
+                    }
+                } else {
+                    console.log("MAIN: Monitors Tab - No active scenario found or scenario data missing for monitors display.");
+                    // Return a valid HTMLElement or a promise resolving to one
+                    const noScenarioPanel = document.createElement('div');
+                    noScenarioPanel.className = 'tab-panel-placeholder'; // Add a class for styling
+                    noScenarioPanel.innerHTML = `
+                        <h2>Patient Monitors</h2>
+                        <p style="text-align: center; color: #888; margin-top: 20px;">
+                            Please start or select an active scenario to view patient monitors.
+                        </p>`;
+                    return Promise.resolve(noScenarioPanel); // Wrap in Promise.resolve if other paths return promises
+                }
+            }
         }
     ];
     console.log("MAIN: Initial static globalTabConfigurations set:", globalTabConfigurations.length);
@@ -232,6 +291,10 @@ function handleTabClose(tabId) {
     if (essentialTabs.includes(tabId) && !globalTabConfigurations.find(t => t.id === tabId)?.isCloseableOverride) {
         console.warn("MAIN: Attempt to close essential tab prevented:", tabId);
         return;
+    }
+    if (tabId === 'monitors-main' && currentMonitorsScreenInstance) {
+        currentMonitorsScreenInstance.cleanup(); // Cleanup monitor instances
+        currentMonitorsScreenInstance = null;
     }
     if (tabId.startsWith('scenario-')) {
         const endedScenario = game.endScenario(tabId, appData);
@@ -751,93 +814,207 @@ function parseGeminiScenarioData(responseText) {
 
 // js/main.js
 
-// --- Helper Function for Processing AI State Updates ---
+// ... (other functions) ...
+
 /**
  * Processes state updates received from Gemini.
  * @param {Object} updates - The stateUpdates object from Gemini's response.
  * @param {string} scenarioId - The ID of the current scenario.
- * @param {string} scenarioName - The name of the current scenario (for new tab labels).
- * @param {Object} currentAppData - The main appData object (to check existing states if needed).
+ * @param {string} scenarioName - The name of the current scenario.
+ * @param {Object} currentAppDataRef - Reference to the main appData object.
  */
-function processAiStateUpdates(updates, scenarioId, scenarioName, currentAppData) {
+function processAiStateUpdates(updates, scenarioId, scenarioName, currentAppDataRef) {
     if (!updates || Object.keys(updates).length === 0) {
+        console.log("MAIN_PROCESS_UPDATES: No state updates to process for scenario", scenarioId);
         return; // No updates to process
     }
-    console.log(`MAIN: Processing AI stateUpdates for scenario ${scenarioId}:`, updates);
+    console.log(`MAIN_PROCESS_UPDATES: Processing for scenario ${scenarioId} ('${scenarioName}'):`, JSON.parse(JSON.stringify(updates)));
 
-    const pulseOxTabId = `pulseox-monitor-${scenarioId}`;
+    let stateDidChangeOverall = false; // Flag if any part of appData or monitor state actually changed
+    let needsMonitorScreenRefresh = false; // Flag if the main monitor screen UI needs a full re-render
 
-    // Pulse Oximeter Visibility
-    if (updates.hasOwnProperty('MONITOR_PULSEOXIMETER_VISIBLE')) {
-        if (updates.MONITOR_PULSEOXIMETER_VISIBLE === true) {
-            console.log("MAIN: AI requests PulseOx VISIBLE for scenario:", scenarioId);
-            if (window.appShell && typeof window.appShell.addPulseOximeterTabForScenario === 'function') {
-                window.appShell.addPulseOximeterTabForScenario(scenarioId, scenarioName); // scenarioName passed for new tab
-                // Optional: System message if it's not the initial scenario setup's action processing
-                // if (window.appShell.getActiveTabId() === scenarioId) { // Check if this is a subsequent update
-                //    ui.appendToScenarioLog(scenarioId, "System: Pulse oximeter display activated by AI.", false);
-                // }
-            }
-        } else if (updates.MONITOR_PULSEOXIMETER_VISIBLE === false) {
-            console.log("MAIN: AI requests PulseOx HIDDEN for scenario:", scenarioId);
-            if (window.appShell && typeof window.appShell.closeTab === 'function') {
-                window.appShell.closeTab(pulseOxTabId);
-                // if (window.appShell.getActiveTabId() === scenarioId) {
-                //    ui.appendToScenarioLog(scenarioId, "System: Pulse oximeter display deactivated by AI.", false);
-                // }
+    // --- Monitor Visibility (Example for Patient Monitor Screen itself) ---
+    if (updates.hasOwnProperty('MONITOR_SCREEN_VISIBLE')) {
+        const shouldBeVisible = updates.MONITOR_SCREEN_VISIBLE === true;
+        console.log(`MAIN_PROCESS_UPDATES: AI requests Patient Monitor Screen Visible: ${shouldBeVisible} for ${scenarioId}`);
+        const scenario = currentAppDataRef.playerData.activeScenarios[scenarioId];
+        if (scenario) {
+            if (!scenario.showMonitorsObject) scenario.showMonitorsObject = {}; // Using a different flag for clarity
+            if (scenario.showMonitorsObject.mainScreen !== shouldBeVisible) {
+                scenario.showMonitorsObject.mainScreen = shouldBeVisible;
+                stateDidChangeOverall = true;
             }
         }
-    }
-
-    // Pulse Oximeter Vital Targets
-    const pulseOxTargets = {};
-    if (updates.hasOwnProperty('VITALS_HEARTRATE_TARGET')) {
-        pulseOxTargets.hr = parseFloat(updates.VITALS_HEARTRATE_TARGET);
-    }
-    if (updates.hasOwnProperty('VITALS_SPO2_TARGET')) {
-        pulseOxTargets.spo2 = parseFloat(updates.VITALS_SPO2_TARGET);
-    }
-
-    if (Object.keys(pulseOxTargets).length > 0) {
-        let hrDuration = updates.VITALS_HEARTRATE_DURATION; // Keep as string or number from AI
-        let spo2Duration = updates.VITALS_SPO2_DURATION;
-        let effectiveDuration = 0; // Default to instant
-
-        // Determine effective duration (can be more sophisticated if needed)
-        if (pulseOxTargets.hasOwnProperty('hr') && !isNaN(parseFloat(hrDuration)) && parseFloat(hrDuration) >= 0) {
-            effectiveDuration = parseFloat(hrDuration);
-        } else if (pulseOxTargets.hasOwnProperty('spo2') && !isNaN(parseFloat(spo2Duration)) && parseFloat(spo2Duration) >= 0) {
-            effectiveDuration = parseFloat(spo2Duration);
-        } else if (updates.hasOwnProperty('VITALS_DEFAULT_DURATION') && !isNaN(parseFloat(updates.VITALS_DEFAULT_DURATION))) {
-            effectiveDuration = parseFloat(updates.VITALS_DEFAULT_DURATION);
-        }
-        effectiveDuration = Math.max(0, effectiveDuration); // Ensure non-negative
-
-        console.log(`MAIN: AI Vitals for PulseOx ${scenarioId}:`, pulseOxTargets, "Duration:", effectiveDuration);
-        if (window.pulseOximeter && typeof window.pulseOximeter.setTargetVitals === 'function') {
-            window.pulseOximeter.setTargetVitals(scenarioId, pulseOxTargets, effectiveDuration);
-            // Optionally, log this change to the scenario's event log if it's a subsequent update
-            // if (window.appShell.getActiveTabId() === scenarioId) {
-            //     let vitalsMsg = "System: AI updated vitals - ";
-            //     if(pulseOxTargets.hr !== undefined) vitalsMsg += `HR target: ${pulseOxTargets.hr}. `;
-            //     if(pulseOxTargets.spo2 !== undefined) vitalsMsg += `SpO2 target: ${pulseOxTargets.spo2}. `;
-            //     vitalsMsg += `(Change over ${effectiveDuration}s).`;
-            //     ui.appendToScenarioLog(scenarioId, vitalsMsg, false);
-            // }
+        if (shouldBeVisible) {
+            if (activeGlobalTabId !== 'monitors-main' || (currentMonitorsScreenInstance && currentMonitorsScreenInstance.activeScenarioId !== scenarioId)) {
+                handleTabClick('monitors-main'); // Activate/refresh monitors tab
+            }
+            needsMonitorScreenRefresh = true; // Ensure it re-renders with correct scenario
+        } else {
+            if (activeGlobalTabId === 'monitors-main' && currentMonitorsScreenInstance?.activeScenarioId === scenarioId) {
+                if (window.patientMonitor) window.patientMonitor.hideAllDisplay(scenarioId); // Method in patientMonitor
+            }
         }
     }
-    // TODO: Add processing for other monitors (NBP, Temp, ECG) here
-    // Example:
-    // if (updates.hasOwnProperty('VITALS_NBP_SYSTOLIC_TARGET')) {
-    //     const nbpData = { sys: parseFloat(updates.VITALS_NBP_SYSTOLIC_TARGET) };
-    //     if (updates.hasOwnProperty('VITALS_NBP_DIASTOLIC_TARGET')) {
-    //         nbpData.dia = parseFloat(updates.VITALS_NBP_DIASTOLIC_TARGET);
-    //     }
-    //     const nbpDuration = parseFloat(updates.VITALS_NBP_DURATION || 0);
-    //     window.nbpDisplay?.setNextReading(scenarioId, nbpData, nbpDuration); // Assuming nbpDisplay module
-    // }
+    // Add similar for individual monitor channel visibility if AI controls that directly
+    // e.g., updates.MONITOR_PULSEOXIMETER_VISIBLE (though patientMonitor often shows all its channels)
+
+
+    // --- Process Vital Sign Targets and Durations ---
+    const vitalTargets = {};    // To collect { hr: val, spo2: val, ... }
+    const vitalDurations = {};  // To collect { hr: dur, spo2: dur, ... }
+    let anyVitalsToSetToMonitor = false;
+
+    const defaultDuration = parseFloat(updates.VITALS_DEFAULT_DURATION);
+    const fallbackDuration = (!isNaN(defaultDuration) && defaultDuration >= 0) ? defaultDuration : 5; // Default 5s if not specified
+
+    // Helper to process each vital
+    const processVital = (vitalKeyInUpdates, targetKeyInObject, durationKeyInObject) => {
+        if (updates.hasOwnProperty(vitalKeyInUpdates)) {
+            const target = parseFloat(updates[vitalKeyInUpdates]);
+            if (!isNaN(target)) {
+                vitalTargets[targetKeyInObject] = target;
+                const duration = parseFloat(updates[durationKeyInObject]);
+                vitalDurations[targetKeyInObject] = (!isNaN(duration) && duration >= 0) ? duration : fallbackDuration;
+                anyVitalsToSetToMonitor = true;
+            } else {
+                console.warn(`MAIN_PROCESS_UPDATES: Invalid target for ${vitalKeyInUpdates}: ${updates[vitalKeyInUpdates]}`);
+            }
+        }
+    };
+    const processStringVital = (vitalKeyInUpdates, targetKeyInObject) => {
+        if (updates.hasOwnProperty(vitalKeyInUpdates)) {
+            vitalTargets[targetKeyInObject] = String(updates[vitalKeyInUpdates]);
+            anyVitalsToSetToMonitor = true; // String vitals are usually instant
+            vitalDurations[targetKeyInObject] = 0; // Implicit instant change
+        }
+    };
+
+
+    // ECG & Heart Rate
+    processVital('VITALS_HEARTRATE_TARGET', 'hr', 'VITALS_HEARTRATE_DURATION');
+    processStringVital('VITALS_ECG_RHYTHM', 'ecgRhythm');
+
+    // SpO2
+    processVital('VITALS_SPO2_TARGET', 'spo2', 'VITALS_SPO2_DURATION');
+
+    // ABP (Arterial Blood Pressure)
+    processVital('VITALS_ABP_SYSTOLIC_TARGET', 'abpSys', 'VITALS_ABP_DURATION'); // Assume common duration for sys/dia
+    processVital('VITALS_ABP_DIASTOLIC_TARGET', 'abpDia', 'VITALS_ABP_DURATION');
+
+    // NBP (Non-Invasive Blood Pressure) - NBP results are usually instant updates
+    if (updates.hasOwnProperty('VITALS_NBP_SYSTOLIC_TARGET')) {
+        const sysTarget = parseFloat(updates.VITALS_NBP_SYSTOLIC_TARGET);
+        const diaTarget = parseFloat(updates.VITALS_NBP_DIASTOLIC_TARGET); // NBP Dia should also be present
+        if (!isNaN(sysTarget) && !isNaN(diaTarget)) {
+            vitalTargets.nbpSys = sysTarget;
+            vitalTargets.nbpDia = diaTarget;
+            vitalDurations.nbpSys = 0; // NBP results are instant
+            vitalDurations.nbpDia = 0;
+            // NBP_DURATION from AI might mean "time until next auto cycle", not change duration
+            // For now, treat NBP target setting as an instant result update.
+            anyVitalsToSetToMonitor = true;
+        }
+    }
+    if (updates.hasOwnProperty('REQUEST_NBP_CYCLE') && updates.REQUEST_NBP_CYCLE === true) {
+        if (window.patientMonitor) window.patientMonitor.takeNbpReading(scenarioId); // Trigger NBP cycle
+        anyVitalsToSetToMonitor = true; // An action occurred
+    }
+
+
+    // EtCO2 & Respiratory Rate
+    processVital('VITALS_ETCO2_TARGET', 'etco2', 'VITALS_ETCO2_DURATION');
+    processStringVital('VITALS_ETCO2_UNIT', 'etco2Unit');
+    processVital('VITALS_RESPIRATORYRATE_TARGET', 'rr', 'VITALS_RESPIRATORYRATE_DURATION');
+
+    // Temperature
+    processVital('VITALS_TEMP_TARGET', 'temp', 'VITALS_TEMP_DURATION');
+
+    // Call patientMonitor if any vital targets were identified
+    if (anyVitalsToSetToMonitor) {
+        console.log(`MAIN_PROCESS_UPDATES: AI Vitals for PatientMonitor ${scenarioId}: Targets:`, vitalTargets, "Durations:", vitalDurations);
+        if (window.patientMonitor && typeof window.patientMonitor.setTargetVitals === 'function') {
+            window.patientMonitor.setTargetVitals(scenarioId, vitalTargets, vitalDurations);
+        } else {
+            console.error("MAIN_PROCESS_UPDATES: window.patientMonitor.setTargetVitals not found!");
+        }
+        stateDidChangeOverall = true; // Vitals were commanded to change
+        needsMonitorScreenRefresh = true; // Monitor display likely needs to reflect this
+    }
+
+    // General Monitor Controls
+    if (updates.hasOwnProperty('MONITOR_ALARMS_MUTED')) {
+        if (window.patientMonitor) window.patientMonitor.toggleMuteAlarms(scenarioId, updates.MONITOR_ALARMS_MUTED);
+        stateDidChangeOverall = true;
+    }
+    if (updates.hasOwnProperty('MONITOR_DISPLAY_PAUSED')) { // Pauses the entire patient monitor widget
+        if (window.patientMonitor) window.patientMonitor.togglePauseInstance(scenarioId, updates.MONITOR_DISPLAY_PAUSED);
+        stateDidChangeOverall = true;
+    }
+
+
+    // --- Final Actions Based on Changes ---
+    if (stateDidChangeOverall) {
+        // Sync all current vital values from the monitor instance back to appData
+        // This is important because setTargetVitals might have made instant changes
+        // or ongoing changes will be reflected in the instance.
+        updateCurrentScenarioVitalsToAppData(scenarioId, currentAppDataRef);
+        storage.saveAppData(currentAppDataRef);
+        console.log("MAIN_PROCESS_UPDATES: appData saved after AI state updates for", scenarioId);
+    }
+
+    if (needsMonitorScreenRefresh && activeGlobalTabId === 'monitors-main' &&
+        currentMonitorsScreenInstance?.activeScenarioId === scenarioId) {
+        console.log("MAIN_PROCESS_UPDATES: Monitors tab is active and state changed for its scenario, forcing its content refresh.");
+        renderActiveTabContent(); // This will re-run monitorsScreen.getContentElement
+    }
 }
-// --- End Helper Function ---
+
+// ... (rest of main.js, including updateCurrentScenarioVitalsToAppData, initializeGame, etc.)
+
+// js/main.js
+function updateCurrentScenarioVitalsToAppData(scenarioId, currentAppDataRef) {
+    const scenario = currentAppDataRef.playerData.activeScenarios?.[scenarioId];
+    const monitorInstance = window.patientMonitor?.instances[scenarioId];
+
+    if (scenario && monitorInstance && monitorInstance.vitals) {
+        if (!scenario.patientData) scenario.patientData = {};
+        if (!scenario.patientData.vitals) scenario.patientData.vitals = {};
+
+        // Sync ALL current vitals from instance to appData
+        for (const key in monitorInstance.vitals) {
+            if (monitorInstance.vitals.hasOwnProperty(key)) {
+                scenario.patientData.vitals[key] = monitorInstance.vitals[key];
+            }
+        }
+        // Sync targets and remaining durations
+        if (monitorInstance.targets) {
+            for (const key in monitorInstance.targets) {
+                if (monitorInstance.targets.hasOwnProperty(key)) {
+                    const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+                    scenario.patientData.vitals[`target${capKey}`] = monitorInstance.targets[key];
+                }
+            }
+        }
+        if (monitorInstance.durations) {
+            for (const key in monitorInstance.durations) {
+                if (monitorInstance.durations.hasOwnProperty(key)) {
+                    scenario.patientData.vitals[`${key}DurationRemaining`] = monitorInstance.durations[key] || 0;
+                }
+            }
+        }
+        // Persist monitor's own pause state
+        // if (scenario.visibleMonitors) { // visibleMonitors is for which *types* are shown in monitorsScreen
+        //     // This might need a different structure if each monitor channel can be paused
+        // }
+        scenario.patientData.vitals.isOverallMonitorPaused = monitorInstance.isPaused; // Save the main pause state
+
+        console.log(`MAIN_SYNC_VITALS: Synced PatientMonitor instance (${scenarioId}) vitals to appData.`);
+    } else {
+        console.warn(`MAIN_SYNC_VITALS: Could not sync for ${scenarioId}, scenario or monitor instance/vitals missing.`);
+    }
+}
+
 
 // --- Input Area Management ---
 const inputArea = document.getElementById('input-area');
@@ -891,7 +1068,7 @@ if (submitCommandBtn && playerCommandInput) {
 
 async function processPlayerCommand() {
     const originalCommand = playerCommandInput.value.trim();
-    if (originalCommand && activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
+    if (originalCommand && activeGlobalTabId) {
         const scenario = appData.playerData.activeScenarios[activeGlobalTabId];
         if (scenario && scenario.isPaused) {
             alert("Scenario is paused. Please resume to continue.");
@@ -962,72 +1139,8 @@ function formatTime(totalSeconds) {
 }
 
 
-function addPulseOximeterTabForScenario(scenarioId, scenarioName) {
-    const pulseOxTabId = `pulseox-monitor-${scenarioId}`;
-    const safeScenarioName = scenarioName || "Scenario";
-    const pulseOxTabLabel = `PulseOx: ${safeScenarioName.substring(0, 10)}${safeScenarioName.length > 10 ? '...' : ''}`;
 
-    console.log(`MAIN_addPulseOxTab: Attempting for scenarioId: ${scenarioId}, tabId: ${pulseOxTabId}, label: ${pulseOxTabLabel}`);
-
-    if (globalTabConfigurations.find(t => t.id === pulseOxTabId)) {
-        console.log(`MAIN_addPulseOxTab: Tab ${pulseOxTabId} already exists. Switching or refreshing.`);
-        if (activeGlobalTabId !== pulseOxTabId) {
-            handleTabClick(pulseOxTabId); // Switch to it
-        } else {
-            // If already active, refresh its content. This relies on the contentGenerator being re-run.
-            // A more direct refresh might be needed if contentGenerator is complex.
-            // For now, handleTabClick -> updateGlobalTabsAndContent -> renderActiveTabContent will re-run the generator.
-            renderActiveTabContent(); // Re-render the current (already active) tab
-        }
-        return; // Exit because tab already exists
-    }
-
-    console.log(`MAIN_addPulseOxTab: Calling addGlobalTab for ${pulseOxTabId}`);
-    addGlobalTab( // This calls the generic addGlobalTab
-        pulseOxTabId,
-        pulseOxTabLabel,
-        true,  // isCloseable
-        true,  // switchToNewTab - IMPORTANT! Set this to TRUE if you want it to become active
-        (currentAppData) => { // contentGenerator for the pulse oximeter tab
-            console.log(`MAIN_addPulseOxTab: ContentGenerator executing for ${pulseOxTabId}`);
-            const panelWrapper = document.createElement('div');
-            panelWrapper.innerHTML = `<div class="in-tab-loading"><div class="spinner"></div><p>Loading Pulse Oximeter...</p></div>`;
-
-            if (!window.ui || typeof window.ui.fetchHtmlTemplate !== 'function') {
-                console.error("MAIN_addPulseOxTab (ContentGen): ui.fetchHtmlTemplate not available!");
-                panelWrapper.innerHTML = "<p class='error-message'>Error: Core UI functions missing for monitor.</p>";
-                return panelWrapper;
-            }
-
-            window.ui.fetchHtmlTemplate('components/monitors/pulseOximeter/pulseOximeter.html')
-                .then(htmlString => {
-                    console.log(`MAIN_addPulseOxTab (ContentGen): HTML fetched for ${pulseOxTabId}. Injecting.`);
-                    if (htmlString.toLowerCase().includes("error loading ui component")) {
-                        panelWrapper.innerHTML = htmlString; return;
-                    }
-                    if (!window.ui || typeof window.ui.injectHtmlWithPlaceholders !== 'function') { /* error */ return; }
-
-                    window.ui.injectHtmlWithPlaceholders(panelWrapper, htmlString, { "{{SCENARIO_ID}}": scenarioId });
-
-                    if (window.pulseOximeter && typeof window.pulseOximeter.initInstance === 'function') {
-                        const scData = currentAppData.playerData.activeScenarios[scenarioId];
-                        // Use the VITAL values Gemini JUST provided if available in stateUpdates, otherwise defaults
-                        const latestUpdates = window.appShell?.getLastAiStateUpdates?.() || {}; // Need a way to get latest AI updates if needed here
-
-                        const initialSpo2 = latestUpdates.VITALS_SPO2_TARGET !== undefined ? latestUpdates.VITALS_SPO2_TARGET :
-                            (scData?.patientData?.vitals?.spo2 ?? (scData?.vitals?.spo2 !== undefined ? scData.vitals.spo2 : 98));
-                        const initialHr = latestUpdates.VITALS_HEARTRATE_TARGET !== undefined ? latestUpdates.VITALS_HEARTRATE_TARGET :
-                            (scData?.patientData?.vitals?.hr ?? (scData?.vitals?.hr !== undefined ? scData.vitals.hr : 70));
-
-                        console.log(`MAIN_addPulseOxTab (ContentGen): Initializing pulseOximeter JS for ${scenarioId} with SpO2: ${initialSpo2}, HR: ${initialHr}`);
-                        window.pulseOximeter.initInstance(scenarioId, initialSpo2, initialHr);
-                    } else { /* error */ }
-                })
-                .catch(error => { /* error handling */ });
-            return panelWrapper;
-        }
-    );
-}
+// ... (rest of your main.js file: initializeGame, other handlers, appShell definition, etc.) ...
 
 // --- Global Event Listeners & Game Start ---
 document.addEventListener('DOMContentLoaded', initializeGame);
@@ -1069,33 +1182,48 @@ window.appShell = {
             startBtn.style.opacity = disable ? '0.7' : '1';
         }
     },
+    handleApiKeyChange,         // Expose for dataManagementScreen
+    handleFontPreferenceChange, // Expose for dataManagementScreen
+    handleImportRequest,        // Expose for dataManagementScreen
+    handleExportRequest,        // Expose for dataManagementScreen
     getRecentlyClosedScenarios: () => appData.playerData.recentlyClosedScenarios || [],
     reopenClosedScenario: handleReopenScenarioRequest,
     processAiStateUpdates, // Expose the helper
-    addPulseOximeterTabForScenario, // Expose this
+    toggleScenarioMonitor: (scenarioId, monitorType, show) => { // New function
+        if (currentMonitorsScreenInstance && currentMonitorsScreenInstance.activeScenarioId === scenarioId) {
+            currentMonitorsScreenInstance.toggleMonitorVisibility(monitorType, show);
+        } else if (show) {
+            // If monitors tab isn't active for this scenario, activate it then toggle
+            handleTabClick('monitors-main'); // This will ensure it's set for the right scenario
+            setTimeout(() => { // Defer actual toggle
+                if (currentMonitorsScreenInstance && currentMonitorsScreenInstance.activeScenarioId === scenarioId) {
+                    currentMonitorsScreenInstance.toggleMonitorVisibility(monitorType, true);
+                }
+            }, 150);
+        }
+    },
     closeTab: function (tabIdToClose) { /* ... as before ... */ },
     pauseActiveScenarioTimer: () => { if (activeGlobalTabId?.startsWith('scenario-')) pauseScenarioTimer(activeGlobalTabId); },
     resumeActiveScenarioTimer: () => { if (activeGlobalTabId?.startsWith('scenario-')) resumeScenarioTimer(activeGlobalTabId); },
     getOpenTabIds: () => globalTabConfigurations.map(t => t.id) // Ensure this is here
 };
 
+
 window.addEventListener('beforeunload', (event) => {
-    console.log("MAIN: beforeunload event triggered. Performing IMMEDIATE save.");
-    if (appDataSaveTimeoutId) { // If a debounced save was pending, clear it
-        clearTimeout(appDataSaveTimeoutId);
-        appDataSaveTimeoutId = null;
-    }
-    // Update elapsed time for the active scenario one last time
-    if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {
-        const scenario = appData.playerData.activeScenarios?.[activeGlobalTabId];
-        if (scenario && !scenario.isPaused) {
-            const now = Date.now();
-            const deltaSeconds = Math.floor((now - scenario.lastUpdatedTimestamp) / 1000);
-            if (deltaSeconds >= 0) {
-                scenario.elapsedSeconds += deltaSeconds;
+    console.log("MAIN: beforeunload. Updating final vitals and saving.");
+    // Update current vitals from ALL active, unpaused monitor instances to appData
+    if (appData.playerData && appData.playerData.activeScenarios) {
+        Object.keys(appData.playerData.activeScenarios).forEach(scenarioId => {
+            const scenario = appData.playerData.activeScenarios[scenarioId];
+            if (scenario && !scenario.isPaused) { // Check main scenario pause
+                // Update elapsed time
+                const now = Date.now();
+                const deltaSeconds = Math.floor((now - scenario.lastUpdatedTimestamp) / 1000);
+                if (deltaSeconds >= 0) scenario.elapsedSeconds += deltaSeconds;
+                // Sync monitor instance current values to appData
+                updateCurrentScenarioVitalsToAppData(scenarioId, appData);
             }
-        }
+        });
     }
-    storage.saveAppData(appData); // Immediate save
-    console.log("MAIN: appData saved on beforeunload.");
+    storage.saveAppData(appData);
 });

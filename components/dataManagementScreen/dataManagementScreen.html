@@ -1,0 +1,41 @@
+<!-- components/dataManagementScreen/dataManagementScreen.html -->
+<div class="data-management-panel-content"> <!-- Root class for css/data-panel.css -->
+    <h2>Data & Settings Management</h2>
+
+    <div class="data-section">
+        <h3>Gemini API Key</h3>
+        <p class="api-key-status">
+            Current Status: <span id="dms-api-key-display-status">Not Set</span> <!-- Populated by JS -->
+        </p>
+        <div class="form-group">
+            <label for="dms-gemini-api-key-input">Enter/Update API Key:</label>
+            <input type="password" id="dms-gemini-api-key-input" class="dms-input" placeholder="Paste your API key here">
+        </div>
+        <button id="dms-save-api-key-btn" class="data-section-button">Save API Key</button>
+        <p class="small-text api-key-note">Your API key is stored locally in your browser and is only used to communicate with the Gemini API for generating scenario content.</p>
+    </div>
+
+    <hr>
+
+    <div class="data-section">
+        <h3>Display Font</h3>
+        <div class="form-group font-selector-section"> <!-- class for styling font selector -->
+            <label for="dms-font-select">Select Display Font:</label>
+            <select id="dms-font-select" class="dms-select">
+                <option value="normal">Normal (Sans-Serif)</option>
+                <option value="monospace">Monospace</option>
+                <option value="handwriting">Handwriting</option>
+            </select>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="data-section">
+        <h3>Import / Export Game Data</h3>
+        <p>Save your entire game progress, API key, and settings to a file, or load a previous save.</p>
+        <button id="dms-import-data-btn" class="data-section-button">Import Data from File</button>
+        <input type="file" id="dms-import-file-input" accept=".json" style="display: none;"> <!-- Hidden file input -->
+        <button id="dms-export-data-btn" class="data-section-button">Export Data to File</button>
+    </div>
+</div>

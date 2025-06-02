@@ -1,0 +1,168 @@
+/* patientMonitor/patientMonitor.css */
+.patient-monitor-widget {
+    background-color: #000000; /* Pure black */
+    color: #FFFFFF;
+    font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif; /* Common monitor font */
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    height: 100%; /* Fill its container in monitorsScreen */
+    box-sizing: border-box;
+    border: 1px solid #333; /* Optional outer border */
+    border-radius: 5px;
+    overflow: hidden; /* Prevent internal elements from breaking layout */
+}
+
+.monitor-header-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8em;
+    color: #CCCCCC; /* Light gray for header text */
+    padding: 2px 5px;
+    border-bottom: 1px solid #222222;
+    margin-bottom: 5px;
+    flex-shrink: 0;
+}
+.monitor-current-time {
+    color: #A0A0A0; /* Dimmer for time */
+}
+
+.monitor-main-grid {
+    flex-grow: 1;
+    display: grid;
+    /* Adjust grid columns based on how many params you want side-by-side */
+    /* For example, 2 main columns for waveforms + numerics, then smaller numeric columns */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Responsive */
+    /* Or fixed columns: grid-template-columns: 2fr 1fr; for waveform | numerics */
+    gap: 5px; /* Small gap between channels */
+    overflow-y: auto; /* If too many channels, allow scroll */
+}
+
+.monitor-channel {
+    /* background-color: #050505; */ /* Slightly off-black for channel background if needed */
+    border: 1px solid #1a1a1a; /* Subtle border for each channel */
+    border-radius: 3px;
+    padding: 5px;
+    display: flex;
+    flex-direction: row; /* Waveform and numerics side-by-side */
+    overflow: hidden; /* Important for canvas */
+}
+
+/* Channels that are numeric only */
+.nbp-channel-numeric-only,
+.temp-channel-numeric-only {
+    flex-direction: column; /* Stack label and value */
+    justify-content: center;
+    align-items: center;
+    min-height: 70px; /* Give them some space */
+}
+
+
+.waveform-area {
+    flex-grow: 3; /* Waveform takes more space */
+    position: relative; /* For absolute positioning of labels on waveform */
+    display: flex; /* For canvas to fill */
+    align-items: center; /* Center canvas vertically if needed */
+    justify-content: center;
+    min-width: 150px; /* Minimum width for waveform */
+}
+.monitor-canvas {
+    display: block;
+    width: 100%;
+    height: 100px; /* Default waveform height */
+    /* background-color: #000; */ /* Already black from widget */
+}
+.ecg-wave { /* stroke: green */ }
+.pleth-wave { /* stroke: cyan/yellow */ }
+.abp-wave { /* stroke: red */ }
+.etco2-wave { /* stroke: white/yellow */ }
+
+.waveform-label {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    font-size: 0.7em;
+    color: #888888;
+    text-transform: uppercase;
+}
+.ecg-rhythm-text {
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    font-size: 0.7em;
+    color: #00FF00; /* Green */
+}
+
+
+.numeric-area {
+    flex-grow: 1;
+    min-width: 100px; /* Space for numerics */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end; /* Align numbers to the right */
+    justify-content: center;
+    padding-left: 8px;
+    white-space: nowrap;
+}
+.vital-label {
+    font-size: 0.9em;
+    color: #AAAAAA; /* Label color */
+    margin-bottom: -2px; /* Adjust spacing */
+}
+.vital-value {
+    font-size: 2.8em; /* Large numbers */
+    font-weight: bold;
+    line-height: 1;
+}
+.vital-unit {
+    font-size: 0.8em;
+    color: #AAAAAA;
+    margin-left: 2px;
+}
+.map-value, .nbp-time, .vital-sub-numeric {
+    font-size: 0.75em;
+    color: #888888;
+    margin-top: 1px;
+}
+.large-nbp { font-size: 2em; } /* Slightly smaller for NBP pair */
+.nbp-unit { font-size: 0.9em; }
+.sub-label { margin-right: 3px; }
+.sub-value { font-size: 1.2em; color: #FFF; } /* For RR from EtCO2 */
+
+
+/* Specific Numeric Colors based on reference image */
+.hr-numeric .vital-value, .hr-numeric .vital-label { color: #00FF00; /* Green */ }
+.spo2-numeric .vital-value, .spo2-numeric .vital-label { color: #00FFFF; /* Cyan */ }
+.abp-numeric .vital-value, .abp-numeric .vital-label, .abp-numeric .map-value { color: #FF0000; /* Red */ }
+.nbp-numeric-display .vital-value, .nbp-numeric-display .vital-label, .nbp-numeric-display .nbp-unit { color: #c97eff; /* Purple from image */ }
+.etco2-numeric .vital-value, .etco2-numeric .vital-label, .etco2-numeric .vital-unit { color: #FFFF00; /* Yellow */ }
+.etco2-numeric .sub-label, .etco2-numeric .sub-value { color: #FFFFFF; /* White for RR */}
+.temp-numeric-display .vital-value, .temp-numeric-display .vital-label { color: #FF8C00; /* Dark Orange */ }
+
+
+.monitor-footer-controls {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 5px;
+    border-top: 1px solid #222222;
+    margin-top: 5px;
+    background-color: #0a0a0a; /* Slightly different footer bg */
+}
+.monitor-button {
+    /* Use styles from components.css or define specific ones */
+    background-color: #181818;
+    color: #999999;
+    border: 1px solid #333333;
+    padding: 6px 10px;
+    font-size: 0.75em;
+    border-radius: 4px;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+.monitor-button:hover {
+    background-color: #282828;
+    color: #CCCCCC;
+}
+/* Specific button icons could be added via ::before pseudo-elements with font icons or SVGs */

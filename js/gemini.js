@@ -8,8 +8,52 @@ VARIABLE_NAME: value
 (e.g., MONITOR_PULSEOXIMETER_VISIBLE: true, VITALS_HEARTRATE_TARGET: 90, VITALS_HEARTRATE_DURATION: 10)
 ---END_GAME_STATE_UPDATES---
 If no game variables are changing this turn, DO NOT include the block.
-Available variables: MONITOR_PULSEOXIMETER_VISIBLE, VITALS_HEARTRATE_TARGET, VITALS_HEARTRATE_DURATION, VITALS_SPO2_TARGET, VITALS_SPO2_DURATION, VITALS_NBP_SYSTOLIC_TARGET, VITALS_NBP_DIASTOLIC_TARGET, VITALS_NBP_DURATION, VITALS_TEMP_TARGET, VITALS_TEMP_DURATION.
----END_SYSTEM_INSTRUCTIONS---
+Available variables for GAME_STATE_UPDATES:
+
+# General Monitor Screen Visibility (if you want AI to suggest opening/closing the whole thing)
+# MONITOR_SCREEN_VISIBLE: true_or_false
+
+# ECG & Heart Rate
+# MONITOR_ECG_VISIBLE: true_or_false # (Controls visibility of ECG channel within the main monitor)
+VITALS_HEARTRATE_TARGET: number      # (e.g., 90 bpm, primarily from ECG)
+VITALS_HEARTRATE_DURATION: number    # (seconds for change, e.g., 15. Use 0 for instant.)
+VITALS_ECG_RHYTHM: "string"          # (e.g., "Sinus Rhythm", "VT", "Asystole", "AFib")
+
+# Pulse Oximeter (SpO2 & Pleth Wave)
+MONITOR_PULSEOXIMETER_VISIBLE: true_or_false # (Controls SpO2/Pleth channel visibility)
+VITALS_SPO2_TARGET: number           # (e.g., 95 %)
+VITALS_SPO2_DURATION: number         # (e.g., 20. Use 0 for instant.)
+
+# Arterial Blood Pressure (ABP - continuous invasive line)
+# MONITOR_ABP_VISIBLE: true_or_false
+VITALS_ABP_SYSTOLIC_TARGET: number   # (e.g., 110 mmHg)
+VITALS_ABP_DIASTOLIC_TARGET: number  # (e.g., 70 mmHg)
+VITALS_ABP_DURATION: number          # (e.g., 10. Use 0 for instant.)
+# (MAP is calculated by the game from Sys/Dia)
+
+# Non-Invasive Blood Pressure (NBP - cuff measurements)
+# MONITOR_NBP_VISIBLE: true_or_false # (Controls NBP display channel visibility)
+REQUEST_NBP_CYCLE: true              # (Set to true to trigger a new NBP measurement by the game)
+VITALS_NBP_SYSTOLIC_TARGET: number   # (e.g., 125 mmHg - This is the RESULT of a cycle)
+VITALS_NBP_DIASTOLIC_TARGET: number  # (e.g., 85 mmHg - This is the RESULT of a cycle)
+VITALS_NBP_DURATION: 0               # (NBP readings are results, so usually instant update once measured)
+
+# EtCO2 (Capnography) & Respiratory Rate
+# MONITOR_ETCO2_VISIBLE: true_or_false
+VITALS_ETCO2_TARGET: number          # (e.g., 40)
+VITALS_ETCO2_DURATION: number        # (e.g., 10)
+VITALS_ETCO2_UNIT: "mmHg"_or_"kPa"   # (e.g., "mmHg")
+VITALS_RESPIRATORYRATE_TARGET: number # (e.g., 18 breaths/min)
+VITALS_RESPIRATORYRATE_DURATION: number # (e.g., 10)
+
+# Temperature
+# MONITOR_TEMP_VISIBLE: true_or_false # (If temp has its own channel to hide/show)
+VITALS_TEMP_TARGET: number           # (e.g., 37.0 Celsius)
+VITALS_TEMP_DURATION: number         # (e.g., 180, temp changes slowly)
+
+# General Monitor Controls
+MONITOR_ALARMS_MUTED: true_or_false
+MONITOR_DISPLAY_PAUSED: true_or_false # (Pauses all waveforms and numeric updates on the main monitor)---END_SYSTEM_INSTRUCTIONS---
 `;
 
 const gemini = {
