@@ -84,7 +84,7 @@ function initializeGame() {
         { // MONITORS TAB CONFIGURATION
             id: 'monitors-main',
             label: 'Patient Monitors',
-            isCloseable: true, // Or false, depending on your preference
+            isCloseable: false, // Or false, depending on your preference
             contentGenerator: (currentAppData) => { // This function is key
                 console.log("MAIN: Monitors Tab contentGenerator CALLED.");
                 let activeScenarioForMonitorsId = null;
@@ -1034,7 +1034,6 @@ function showInputArea() {
             Promise.resolve().then(window.adjustMainContentHeight);
         }
     }
-    if (playerCommandInput) playerCommandInput.focus();
 
     // Update footer timer display logic (as before)
     if (activeGlobalTabId && activeGlobalTabId.startsWith('scenario-')) {

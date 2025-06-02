@@ -32,7 +32,7 @@ const monitorsScreen = {
 
             // Update general info in the patientMonitor template if needed
             const patientIdEl = monitorWidgetRootElement.querySelector(`#pm-patient-id-${scenarioId}`);
-            if (patientIdEl) patientIdEl.textContent = `PATIENT: ${scenarioName.substring(0, 10)}... (${scenarioId.slice(-4)})`;
+            if (patientIdEl) patientIdEl.textContent = scenarioName
 
             // Initialize the patientMonitor JavaScript logic
             if (window.patientMonitor && typeof window.patientMonitor.initInstance === 'function') {
