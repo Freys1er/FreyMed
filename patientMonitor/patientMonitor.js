@@ -104,10 +104,10 @@ const patientMonitor = {
             instance.durations = {}; instance.changeRates = {};
             instance.isPaused = false; instance.alarmsMuted = false; // Monitor's own pause/mute
 
-            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 6.0, amplitude: 0, yOffset: 0 };
+            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
             instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
             instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 5.0, amplitude: 0, yOffset: 0 };
+            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 8.0, amplitude: 0, yOffset: 0 };
             instance._dataInitialized = true; // Mark data as initialized for the first time
         } else {
             console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR from instance: ${instance.vitals?.hr}`);
@@ -198,7 +198,7 @@ const patientMonitor = {
     generateECGWave: function (instance) {
         const waveConfig = instance.ecgWave;
         waveConfig.data = [];
-        const totalPoints = 120; // Increased points for better detail
+        const totalPoints = 30; // Increased points for better detail
         const yBaseline = waveConfig.yOffset;
         const amplitude = waveConfig.amplitude;
 
@@ -310,51 +310,51 @@ const patientMonitor = {
         console.log(`PatientMonitor (${instance.scenarioId}): ABP wave generated.`);
     },
     generateEtCO2Wave: function (instance) {
-    const waveConfig = instance.etco2Wave;
-    waveConfig.data = [];
+        const waveConfig = instance.etco2Wave;
+        waveConfig.data = [];
 
-    // Define lengths for each phase of the EtCO2 waveform
-    const totalCycleLength = 100; // Total points in one complete breath cycle
-    const baselineLength = 20;   // Phase I: Flat baseline (inspiratory)
-    const upstrokeLength = 15;   // Phase II: Rapid rise (expiratory upstroke)
-    const plateauLength = 45;    // Phase III: Alveolar plateau
-    const downstrokeLength = 20; // Phase IV: Rapid fall (inspiratory downstroke)
+        // Define lengths for each phase of the EtCO2 waveform
+        const totalCycleLength = 100; // Total points in one complete breath cycle
+        const baselineLength = 20;   // Phase I: Flat baseline (inspiratory)
+        const upstrokeLength = 10;   // Phase II: Rapid rise (expiratory upstroke)
+        const plateauLength = 40;    // Phase III: Alveolar plateau
+        const downstrokeLength = 5; // Phase IV: Rapid fall (inspiratory downstroke)
 
-    // Ensure phases add up to totalCycleLength (or adjust totalCycleLength)
-    // For demonstration, these add up to 100: 20+15+45+20 = 100
+        // Ensure phases add up to totalCycleLength (or adjust totalCycleLength)
+        // For demonstration, these add up to 100: 20+15+45+20 = 100
 
-    for (let i = 0; i < totalCycleLength; i++) {
-        let y_norm = 0; // Normalized Y value (0 at baseline, 1 at peak)
+        for (let i = 0; i < totalCycleLength; i++) {
+            let y_norm = 0; // Normalized Y value (0 at baseline, 1 at peak)
 
-        if (i < baselineLength) {
-            // Phase I: Inspiratory Baseline (flat, near zero CO2)
-            y_norm = 0;
-        } else if (i < baselineLength + upstrokeLength) {
-            // Phase II: Expiratory Upstroke (rapid rise)
-            const phaseProgress = (i - baselineLength) / upstrokeLength;
-            y_norm = phaseProgress;
-        } else if (i < baselineLength + upstrokeLength + plateauLength) {
-            // Phase III: Alveolar Plateau (highest CO2 concentration)
-            // A slight slope can be added for more realism if desired
-            const phaseProgress = (i - (baselineLength + upstrokeLength)) / plateauLength;
-            y_norm = 1 + (phaseProgress * 0.2); // Slight decrease over plateau
-        } else if (i < baselineLength + upstrokeLength + plateauLength + downstrokeLength) {
-            // Phase IV: Inspiratory Downstroke (rapid fall to baseline)
-            const phaseProgress = (i - (baselineLength + upstrokeLength + plateauLength)) / downstrokeLength;
-            y_norm = 1 - phaseProgress;
-        } else {
-            // Should theoretically not be reached if lengths sum up to totalCycleLength
-            // or if it signifies the very start of the next baseline.
-            y_norm = 0;
+            if (i < baselineLength) {
+                // Phase I: Inspiratory Baseline (flat, near zero CO2)
+                y_norm = 0;
+            } else if (i < baselineLength + upstrokeLength) {
+                // Phase II: Expiratory Upstroke (rapid rise)
+                const phaseProgress = (i - baselineLength) / upstrokeLength;
+                y_norm = phaseProgress;
+            } else if (i < baselineLength + upstrokeLength + plateauLength) {
+                // Phase III: Alveolar Plateau (highest CO2 concentration)
+                // A slight slope can be added for more realism if desired
+                const phaseProgress = (i - (baselineLength + upstrokeLength)) / plateauLength;
+                y_norm = 1 + (phaseProgress * 0.2); // Slight decrease over plateau
+            } else if (i < baselineLength + upstrokeLength + plateauLength + downstrokeLength) {
+                // Phase IV: Inspiratory Downstroke (rapid fall to baseline)
+                const phaseProgress = (i - (baselineLength + upstrokeLength + plateauLength)) / downstrokeLength;
+                y_norm = 1 - phaseProgress;
+            } else {
+                // Should theoretically not be reached if lengths sum up to totalCycleLength
+                // or if it signifies the very start of the next baseline.
+                y_norm = 0;
+            }
+
+            // Apply amplitude and yOffset to map to screen coordinates
+            // Assuming yOffset is the baseline for your graph, and amplitude is the height
+            // This calculates the point from bottom-up for easier visualization.
+            waveConfig.data.push(waveConfig.yOffset - y_norm * waveConfig.amplitude);
         }
-
-        // Apply amplitude and yOffset to map to screen coordinates
-        // Assuming yOffset is the baseline for your graph, and amplitude is the height
-        // This calculates the point from bottom-up for easier visualization.
-        waveConfig.data.push(waveConfig.yOffset - y_norm * waveConfig.amplitude);
-    }
-    console.log(`PatientMonitor (${instance.scenarioId}): EtCO2 wave generated.`);
-},
+        console.log(`PatientMonitor (${instance.scenarioId}): EtCO2 wave generated.`);
+    },
     /**
      * Updates the internal data model for a specific monitor instance.
      * @param {string} scenarioId
@@ -580,28 +580,27 @@ const patientMonitor = {
 
         ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.beginPath();
 
         const pointsInOneCycle = waveConfig.data.length;
-        const baseScrollRate = 0.5; // Adjust for base visual speed
-        const effectiveRate = 60; // Use a sensible default if rate is 0/undefined
-        const scrollFactor = (effectiveRate / 60) * waveConfig.scrollSpeedFactor * baseScrollRate;
+        const effectiveRate = rateForSpeed; // Use a sensible default if rate is 0/undefined
+        const scrollFactor = effectiveRate * waveConfig.scrollSpeedFactor * 0.008;
         const pointsToAdvanceThisFrame = scrollFactor;
 
-        const displayWindowPoints = pointsInOneCycle * 6.0; // How many cycles to show
-        const stepX = canvasEl.width / displayWindowPoints;
+        const stepX = 2;
         let firstPoint = true;
 
-        for (let i = 0; i < displayWindowPoints + 1; i++) {
+        for (let i = 0; i < canvasEl.width; i++) {
             const dataIndex = (Math.floor(waveConfig.index) + i) % pointsInOneCycle;
             //Add noise to the y value
-            const y = waveConfig.data[dataIndex]
-            //Add noise
+            const y = waveConfig.data[dataIndex];
             if (typeof y !== 'number') continue;
 
             if (y === undefined || isNaN(y)) continue;
-            const x = i * stepX;
+            const x = i * stepX; // Adjust x based on scroll factor
+            //shift the waveform horizontally to compensate for the laggy movement
+            
             if (firstPoint) { ctx.moveTo(x, y); firstPoint = false; }
             else { ctx.lineTo(x, y); }
         }
