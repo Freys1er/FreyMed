@@ -104,10 +104,10 @@ const patientMonitor = {
             instance.durations = {}; instance.changeRates = {};
             instance.isPaused = false; instance.alarmsMuted = false; // Monitor's own pause/mute
 
-            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 10, amplitude: 1, yOffset: 0 };
-            instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
-            instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
-            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
+            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 8.0, amplitude: 0, yOffset: 0 };
             instance._dataInitialized = true; // Mark data as initialized for the first time
         } else {
             console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR from instance: ${instance.vitals?.hr}`);
@@ -172,7 +172,7 @@ const patientMonitor = {
             }
 
             canvasElement.width = canvasElement.clientWidth || window.innerWidth - 100 || 800; // Default to 800 if clientWidth is zero
-            canvasElement.height = canvasElement.clientHeight || window.innerHeight / 8 || 100;
+            canvasElement.height = canvasElement.clientHeight || window.innerWidth / 12 || 100;
 
             if (canvasElement.height > 0) {
                 waveConfig.yOffset = canvasElement.height / 2;
@@ -198,77 +198,159 @@ const patientMonitor = {
     generateECGWave: function (instance) {
         const waveConfig = instance.ecgWave;
         waveConfig.data = [];
-        const len = 300; // Increased length for a more detailed cycle
-        const sampleRate = 100; // Number of data points per "second" of ECG
-        const totalDuration = len / sampleRate; // Total duration in "seconds"
+        const totalPoints = 30; // Increased points for better detail
+        const yBaseline = waveConfig.yOffset;
+        const amplitude = waveConfig.amplitude;
 
-        for (let i = 0; i < len; i++) {
-            const t = i / sampleRate; // Time in "seconds"
-
-            let y = waveConfig.yOffset; // Start at the baseline
-
-            // P wave (atrial depolarization)
-            // A small, rounded wave
-            const pWaveStart = 0;
-            const pWaveEnd = 0.2;
-            if (t >= pWaveStart && t <= pWaveEnd) {
-                y -= 0.1 * waveConfig.amplitude * Math.sin(Math.PI * (t - pWaveStart) / (pWaveEnd - pWaveStart));
-            }
-
-            // QRS complex (ventricular depolarization)
-            // A rapid, sharp deflection consisting of Q, R, and S waves
-            const qrsStart = 0.3;
-            const qrsEnd = 0.5;
-            if (t >= qrsStart && t <= qrsEnd) {
-                const q = 0.1; // Q wave duration
-                const r = 0.1; // R wave duration
-                const s = 0.1; // S wave duration
-
-                if (t < qrsStart + q) { // Q wave (downward)
-                    y += 0.25 * waveConfig.amplitude * (t - qrsStart) / q;
-                } else if (t < qrsStart + q + r) { // R wave (sharp upward peak)
-                    y -= waveConfig.amplitude * Math.sin(Math.PI * (t - (qrsStart + q)) / r);
-                } else if (t < qrsStart + q + r + s) { // S wave (downward after R)
-                    y += 0.3 * waveConfig.amplitude * Math.sin(Math.PI * (t - (qrsStart + q + r)) / s);
-                }
-            }
-
-            // T wave (ventricular repolarization)
-            // A broader, asymmetric upward wave
-            const tWaveStart = 0.7;
-            const tWaveEnd = 1;
-            if (t >= tWaveStart && t <= tWaveEnd) {
-                y -= 0.1 * waveConfig.amplitude * (1 - Math.cos(Math.PI * (t - tWaveStart) / (tWaveEnd - tWaveStart)));
-            }
-
-            waveConfig.data.push(y);
+        // --- P Wave (Atrial Depolarization) ---
+        const pWaveDuration = totalPoints * 0.08; // Approximately 8% of the cycle
+        const pWaveAmplitude = amplitude * 0.2;
+        for (let i = 0; i < pWaveDuration; i++) {
+            const x = i / pWaveDuration;
+            // A small, rounded positive wave
+            waveConfig.data.push(yBaseline - pWaveAmplitude * (Math.sin(x * Math.PI)));
         }
-        console.log(`PatientMonitor (${instance.scenarioId}): ECG wave generated.`);
+
+        // --- PR Segment (Delay at AV Node) ---
+        const prSegmentDuration = totalPoints * 0.04; // Approximately 4% of the cycle
+        for (let i = 0; i < prSegmentDuration; i++) {
+            waveConfig.data.push(yBaseline); // Flat line
+        }
+
+        // --- QRS Complex (Ventricular Depolarization) ---
+        const qrsComplexDuration = totalPoints * 0.12; // Approximately 12% of the cycle
+        const qrsPeakAmplitude = amplitude * 1.5; // Higher amplitude for QRS
+        const qrsOffset = waveConfig.data.length; // Starting index for QRS
+
+        // Q wave (initial negative deflection)
+        const qWaveDuration = qrsComplexDuration * 0.2;
+        for (let i = 0; i < qWaveDuration; i++) {
+            const x = i / qWaveDuration;
+            waveConfig.data.push(yBaseline + qrsPeakAmplitude * 0.3 * Math.sin(x * Math.PI)); // Sharp downward spike
+        }
+
+        // R wave (tall positive deflection)
+        const rWaveDuration = qrsComplexDuration * 0.4;
+        for (let i = 0; i < rWaveDuration; i++) {
+            const x = i / rWaveDuration;
+            // Sharp upward spike, then back down
+            waveConfig.data.push(yBaseline - qrsPeakAmplitude * (1 - Math.pow(2 * x - 1, 2))); // Parabolic shape for sharp peak
+        }
+
+        // S wave (negative deflection after R)
+        const sWaveDuration = qrsComplexDuration * 0.4;
+        for (let i = 0; i < sWaveDuration; i++) {
+            const x = i / sWaveDuration;
+            waveConfig.data.push(yBaseline + qrsPeakAmplitude * 0.5 * Math.sin(x * Math.PI)); // Sharp downward spike
+        }
+
+        // --- ST Segment (Ventricular Repolarization begins) ---
+        const stSegmentDuration = totalPoints * 0.15; // Approximately 15% of the cycle
+        for (let i = 0; i < stSegmentDuration; i++) {
+            waveConfig.data.push(yBaseline); // Flat line (ideally at baseline)
+        }
+
+        // --- T Wave (Ventricular Repolarization) ---
+        const tWaveDuration = totalPoints * 0.25; // Approximately 25% of the cycle
+        const tWaveAmplitude = amplitude * 0.4;
+        for (let i = 0; i < tWaveDuration; i++) {
+            const x = i / tWaveDuration;
+            // A broader, rounded positive wave
+            waveConfig.data.push(yBaseline - tWaveAmplitude * (Math.sin(x * Math.PI)));
+        }
+
+        // --- U Wave (Optional, not always present) ---
+        // For simplicity, we'll just add a flat line or a very small wave after T
+        const uWaveAndDiastoleDuration = totalPoints - waveConfig.data.length;
+        for (let i = 0; i < uWaveAndDiastoleDuration; i++) {
+            waveConfig.data.push(yBaseline);
+        }
+
+        console.log(`PatientMonitor (${instance.scenarioId}): ECG wave generated with components.`);
     },
-    generatePlethWave: function (instance) { /* ... (your existing more detailed pleth logic) ... */
+    generatePlethWave: function (instance) {
         const waveConfig = instance.plethWave;
-        waveConfig.data = []; const len = 120;
-        for (let i = 0; i < len; i++) { // Placeholder
-            waveConfig.data.push(waveConfig.yOffset - Math.sin(i / (len / (2 * Math.PI))) * waveConfig.amplitude);
+        waveConfig.data = [];
+        const totalPoints = 20; // More points for a smoother wave
+        const yBaseline = waveConfig.yOffset;
+        const amplitude = waveConfig.amplitude * 0.8; // Adjust amplitude as needed
+
+        // Simulate one full cycle of a pleth wave
+        for (let i = 0; i < totalPoints; i++) {
+            const x = i / totalPoints; // Normalize x to be between 0 and 1
+
+            let value;
+
+            value = 0.5 * Math.sin(4 * Math.PI * x) + 0.8 * Math.sin(2 * Math.PI * x)
+
+            // Apply amplitude and yOffset, inverting if needed to match typical display (peaks upwards)
+            waveConfig.data.push(yBaseline - value * amplitude);
         }
+
         console.log(`PatientMonitor (${instance.scenarioId}): Pleth wave generated.`);
     },
     generateABPWave: function (instance) { /* ... (similar to pleth but maybe different shape/color) ... */
         const waveConfig = instance.abpWave;
-        waveConfig.data = []; const len = 120;
-        for (let i = 0; i < len; i++) { // Placeholder
-            waveConfig.data.push(waveConfig.yOffset - (Math.sin(i / (len / (2 * Math.PI))) * 0.7 + Math.sin(i / (len / (2 * Math.PI * 0.5))) * 0.3) * waveConfig.amplitude);
+        waveConfig.data = []; const len = 20;
+        const totalPoints = 20; // More points for a smoother wave
+        const yBaseline = waveConfig.yOffset;
+        const amplitude = waveConfig.amplitude * 0.8; // Adjust amplitude as needed
+
+        // Simulate one full cycle of a pleth wave
+        for (let i = 0; i < totalPoints; i++) {
+            const x = i / totalPoints; // Normalize x to be between 0 and 1
+
+            let value;
+
+            value = 0.5 * Math.sin(4 * Math.PI * x + 0.5) + 0.9 * Math.sin(2 * Math.PI * x)
+
+            // Apply amplitude and yOffset, inverting if needed to match typical display (peaks upwards)
+            waveConfig.data.push(yBaseline - value * amplitude);
         }
         console.log(`PatientMonitor (${instance.scenarioId}): ABP wave generated.`);
     },
-    generateEtCO2Wave: function (instance) { /* ... (capnography waveform - typically boxy) ... */
+    generateEtCO2Wave: function (instance) {
         const waveConfig = instance.etco2Wave;
-        waveConfig.data = []; const len = 120; const plateauLen = 30;
-        for (let i = 0; i < len; i++) {
-            let y_norm = 0;
-            if (i < 10) y_norm = i / 10; // Phase I & II (upstroke)
-            else if (i < 10 + plateauLen) y_norm = 1; // Phase III (plateau)
-            else if (i < 10 + plateauLen + 15) y_norm = 1 - (i - (10 + plateauLen)) / 15; // Phase IV (downstroke)
+        waveConfig.data = [];
+
+        // Define lengths for each phase of the EtCO2 waveform
+        const totalCycleLength = 100; // Total points in one complete breath cycle
+        const baselineLength = 20;   // Phase I: Flat baseline (inspiratory)
+        const upstrokeLength = 10;   // Phase II: Rapid rise (expiratory upstroke)
+        const plateauLength = 40;    // Phase III: Alveolar plateau
+        const downstrokeLength = 5; // Phase IV: Rapid fall (inspiratory downstroke)
+
+        // Ensure phases add up to totalCycleLength (or adjust totalCycleLength)
+        // For demonstration, these add up to 100: 20+15+45+20 = 100
+
+        for (let i = 0; i < totalCycleLength; i++) {
+            let y_norm = 0; // Normalized Y value (0 at baseline, 1 at peak)
+
+            if (i < baselineLength) {
+                // Phase I: Inspiratory Baseline (flat, near zero CO2)
+                y_norm = 0;
+            } else if (i < baselineLength + upstrokeLength) {
+                // Phase II: Expiratory Upstroke (rapid rise)
+                const phaseProgress = (i - baselineLength) / upstrokeLength;
+                y_norm = phaseProgress;
+            } else if (i < baselineLength + upstrokeLength + plateauLength) {
+                // Phase III: Alveolar Plateau (highest CO2 concentration)
+                // A slight slope can be added for more realism if desired
+                const phaseProgress = (i - (baselineLength + upstrokeLength)) / plateauLength;
+                y_norm = 1 + (phaseProgress * 0.2); // Slight decrease over plateau
+            } else if (i < baselineLength + upstrokeLength + plateauLength + downstrokeLength) {
+                // Phase IV: Inspiratory Downstroke (rapid fall to baseline)
+                const phaseProgress = (i - (baselineLength + upstrokeLength + plateauLength)) / downstrokeLength;
+                y_norm = 1 - phaseProgress;
+            } else {
+                // Should theoretically not be reached if lengths sum up to totalCycleLength
+                // or if it signifies the very start of the next baseline.
+                y_norm = 0;
+            }
+
+            // Apply amplitude and yOffset to map to screen coordinates
+            // Assuming yOffset is the baseline for your graph, and amplitude is the height
+            // This calculates the point from bottom-up for easier visualization.
             waveConfig.data.push(waveConfig.yOffset - y_norm * waveConfig.amplitude);
         }
         console.log(`PatientMonitor (${instance.scenarioId}): EtCO2 wave generated.`);
@@ -498,24 +580,27 @@ const patientMonitor = {
 
         ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.beginPath();
 
         const pointsInOneCycle = waveConfig.data.length;
-        const baseScrollRate = 0.5; // Adjust for base visual speed
-        const effectiveRate = 60; // Use a sensible default if rate is 0/undefined
-        const scrollFactor = (effectiveRate / 60) * waveConfig.scrollSpeedFactor * baseScrollRate;
+        const effectiveRate = rateForSpeed; // Use a sensible default if rate is 0/undefined
+        const scrollFactor = effectiveRate * waveConfig.scrollSpeedFactor * 0.008;
         const pointsToAdvanceThisFrame = scrollFactor;
 
-        const displayWindowPoints = pointsInOneCycle * 6.0; // How many cycles to show
-        const stepX = canvasEl.width / displayWindowPoints;
+        const stepX = 2;
         let firstPoint = true;
 
-        for (let i = 0; i < displayWindowPoints + 1; i++) {
+        for (let i = 0; i < canvasEl.width; i++) {
             const dataIndex = (Math.floor(waveConfig.index) + i) % pointsInOneCycle;
+            //Add noise to the y value
             const y = waveConfig.data[dataIndex];
+            if (typeof y !== 'number') continue;
+
             if (y === undefined || isNaN(y)) continue;
-            const x = i * stepX;
+            const x = i * stepX; // Adjust x based on scroll factor
+            //shift the waveform horizontally to compensate for the laggy movement
+            
             if (firstPoint) { ctx.moveTo(x, y); firstPoint = false; }
             else { ctx.lineTo(x, y); }
         }

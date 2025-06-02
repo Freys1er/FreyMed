@@ -50,7 +50,6 @@ textarea {
     box-sizing: border-box; /* Include padding and border in element's total width and height */
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="email"]:focus,
 select:focus,
