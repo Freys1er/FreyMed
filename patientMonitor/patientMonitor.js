@@ -4,164 +4,159 @@ console.log("PatientMonitorJS: Script loaded.");
 const patientMonitor = {
     instances: {}, // Keyed by scenarioId
 
-    // Base IDs for elements within patientMonitor.html
-    // ECG
+    // --- DOM ID BASES (Ensure these match patientMonitor.html after {{SCENARIO_ID}} replacement) ---
     ECG_CANVAS_ID_BASE: 'pm-ecg-canvas-',
     ECG_RHYTHM_ID_BASE: 'pm-ecg-rhythm-',
     HR_VALUE_ID_BASE: 'pm-hr-value-',
-    // SpO2
     PLETH_CANVAS_ID_BASE: 'pm-pleth-canvas-',
     SPO2_VALUE_ID_BASE: 'pm-spo2-value-',
-    // ABP
     ABP_CANVAS_ID_BASE: 'pm-abp-canvas-',
     ABP_VALUE_ID_BASE: 'pm-abp-value-',
     MAP_VALUE_ID_BASE: 'pm-map-value-',
-    // NBP (Numeric)
     NBP_VALUE_ID_BASE: 'pm-nbp-value-',
     NBP_MAP_ID_BASE: 'pm-nbp-map-',
     NBP_TIME_ID_BASE: 'pm-nbp-time-',
-    // EtCO2
     ETCO2_CANVAS_ID_BASE: 'pm-etco2-canvas-',
     ETCO2_VALUE_ID_BASE: 'pm-etco2-value-',
     ETCO2_UNIT_ID_BASE: 'pm-etco2-unit-',
-    RR_VALUE_ID_BASE: 'pm-rr-value-', // Respiratory Rate from EtCO2
-    // Temp
+    RR_VALUE_ID_BASE: 'pm-rr-value-',
     TEMP_VALUE_ID_BASE: 'pm-temp-value-',
-    // Controls
     MUTE_ALARMS_BTN_ID_BASE: 'pm-mute-alarms-btn-',
     PAUSE_ALL_BTN_ID_BASE: 'pm-pause-resume-all-btn-',
-
+    START_NIBP_BTN_SELECTOR: '[data-action="start-nibp"]', // Using data-action as ID might change with scenarioId
 
     /**
      * Initializes or updates a patient monitor instance for a specific scenario.
-     * This is called by monitorsScreen.js after injecting patientMonitor.html into a slot.
+     * The monitorWidgetRootElement IS the content from patientMonitor.html, already injected.
      * @param {string} scenarioId
-     * @param {string} _targetParentContainerId - ID of the slot it was injected into (for context, not strictly needed if IDs are global)
-     * @param {Object} [initialVitals={}] - Initial vitals like { hr, spo2, nbpSys, nbpDia, etco2, rr, temp, abpSys, abpDia, map }
+     * @param {HTMLElement} monitorWidgetRootElement - The root DOM element of this monitor's UI.
+     * @param {Object} [initialVitalsFromCaller={}] - Explicit initial vitals, e.g., from AI or appData.
      */
-
     initInstance: async function (scenarioId, monitorWidgetRootElement, initialVitalsFromCaller = {}) {
-        console.log(`PatientMonitor (${scenarioId}): initInstance CALLED. InitialVitalsFromCaller:`, JSON.parse(JSON.stringify(initialVitalsFromCaller)), "Widget Root:", !!monitorWidgetRootElement);
-        let instance = this.instances[scenarioId];
+        console.log(`PatientMonitor (${scenarioId}): initInstance CALLED. InitialVitalsFromCaller:`, JSON.parse(JSON.stringify(initialVitalsFromCaller)), "Widget Root Provided:", !!monitorWidgetRootElement);
 
-        if (!monitorWidgetRootElement) {
-            console.error(`PatientMonitor (${scenarioId}): CRITICAL - monitorWidgetRootElement was not provided! Cannot initialize.`);
+        if (!monitorWidgetRootElement || typeof monitorWidgetRootElement.querySelector !== 'function') {
+            console.error(`PatientMonitor (${scenarioId}): CRITICAL - monitorWidgetRootElement is invalid or not provided! Cannot initialize.`);
             return;
         }
 
-        // If instance doesn't exist, create it.
-        // If it does exist, we are re-initializing its view (DOM elements) because the HTML was re-injected.
-        // Its data (vitals, targets, wave data) should persist on the instance object itself.
+        let instance = this.instances[scenarioId];
+        // isFirstTimeEverForThisInstanceData: True if we have no prior data for this scenarioId's instance
+        const isFirstTimeEverForThisInstanceData = !instance || !instance.vitals;
+
         if (!instance) {
-            instance = { scenarioId: scenarioId, _domFullyInitialized: false }; // Initialize with _domFullyInitialized false
+            instance = { scenarioId: scenarioId };
             this.instances[scenarioId] = instance;
-            console.log(`PatientMonitor (${scenarioId}): NEW instance object created.`);
-        } else {
-            console.log(`PatientMonitor (${scenarioId}): Re-initializing VIEW for existing instance.`);
-            // Mark DOM as not yet re-initialized for this pass, so we re-fetch elements
-            instance._domFullyInitialized = false;
+            console.log(`PatientMonitor (${scenarioId}): NEW instance object shell created.`);
         }
-        instance.scenarioId = scenarioId; // Ensure it's always set/updated
+        instance.scenarioId = scenarioId; // Ensure it's always set
 
-        // --- DOM Element Fetching (Always do this as HTML is re-injected by monitorsScreen) ---
-        console.log(`PatientMonitor (${scenarioId}): Fetching DOM elements within provided widgetElement.`);
+        // --- DOM Element Fetching (Always re-fetch as monitorWidgetRootElement is new) ---
+        console.log(`PatientMonitor (${scenarioId}): Performing DOM element fetching within provided widgetElement.`);
         instance.dom = {
-            ecgCanvas: monitorWidgetRootElement.querySelector('#' + this.ECG_CANVAS_ID_BASE + scenarioId),
-            ecgRhythmText: monitorWidgetRootElement.querySelector('#' + this.ECG_RHYTHM_ID_BASE + scenarioId),
-            hrValue: monitorWidgetRootElement.querySelector('#' + this.HR_VALUE_ID_BASE + scenarioId),
-            plethCanvas: monitorWidgetRootElement.querySelector('#' + this.PLETH_CANVAS_ID_BASE + scenarioId),
-            spo2Value: monitorWidgetRootElement.querySelector('#' + this.SPO2_VALUE_ID_BASE + scenarioId),
-            abpCanvas: monitorWidgetRootElement.querySelector('#' + this.ABP_CANVAS_ID_BASE + scenarioId),
-            abpValue: monitorWidgetRootElement.querySelector('#' + this.ABP_VALUE_ID_BASE + scenarioId),
-            mapValue: monitorWidgetRootElement.querySelector('#' + this.MAP_VALUE_ID_BASE + scenarioId),
-            nbpValue: monitorWidgetRootElement.querySelector('#' + this.NBP_VALUE_ID_BASE + scenarioId),
-            nbpMap: monitorWidgetRootElement.querySelector('#' + this.NBP_MAP_ID_BASE + scenarioId),
-            nbpTime: monitorWidgetRootElement.querySelector('#' + this.NBP_TIME_ID_BASE + scenarioId),
-            etco2Canvas: monitorWidgetRootElement.querySelector('#' + this.ETCO2_CANVAS_ID_BASE + scenarioId),
-            etco2Value: monitorWidgetRootElement.querySelector('#' + this.ETCO2_VALUE_ID_BASE + scenarioId),
-            etco2Unit: monitorWidgetRootElement.querySelector('#' + this.ETCO2_UNIT_ID_BASE + scenarioId),
-            rrValue: monitorWidgetRootElement.querySelector('#' + this.RR_VALUE_ID_BASE + scenarioId),
-            tempValue: monitorWidgetRootElement.querySelector('#' + this.TEMP_VALUE_ID_BASE + scenarioId),
-            muteAlarmsBtn: monitorWidgetRootElement.querySelector('#' + this.MUTE_ALARMS_BTN_ID_BASE + scenarioId),
-            pauseResumeAllBtn: monitorWidgetRootElement.querySelector('#' + this.PAUSE_ALL_BTN_ID_BASE + scenarioId)
+            ecgCanvas: monitorWidgetRootElement.querySelector(`#${this.ECG_CANVAS_ID_BASE}${scenarioId}`),
+            ecgRhythmText: monitorWidgetRootElement.querySelector(`#${this.ECG_RHYTHM_ID_BASE}${scenarioId}`),
+            hrValue: monitorWidgetRootElement.querySelector(`#${this.HR_VALUE_ID_BASE}${scenarioId}`),
+            plethCanvas: monitorWidgetRootElement.querySelector(`#${this.PLETH_CANVAS_ID_BASE}${scenarioId}`),
+            spo2Value: monitorWidgetRootElement.querySelector(`#${this.SPO2_VALUE_ID_BASE}${scenarioId}`),
+            abpCanvas: monitorWidgetRootElement.querySelector(`#${this.ABP_CANVAS_ID_BASE}${scenarioId}`),
+            abpValue: monitorWidgetRootElement.querySelector(`#${this.ABP_VALUE_ID_BASE}${scenarioId}`),
+            mapValue: monitorWidgetRootElement.querySelector(`#${this.MAP_VALUE_ID_BASE}${scenarioId}`),
+            nbpValue: monitorWidgetRootElement.querySelector(`#${this.NBP_VALUE_ID_BASE}${scenarioId}`),
+            nbpMap: monitorWidgetRootElement.querySelector(`#${this.NBP_MAP_ID_BASE}${scenarioId}`),
+            nbpTime: monitorWidgetRootElement.querySelector(`#${this.NBP_TIME_ID_BASE}${scenarioId}`),
+            etco2Canvas: monitorWidgetRootElement.querySelector(`#${this.ETCO2_CANVAS_ID_BASE}${scenarioId}`),
+            etco2Value: monitorWidgetRootElement.querySelector(`#${this.ETCO2_VALUE_ID_BASE}${scenarioId}`),
+            etco2Unit: monitorWidgetRootElement.querySelector(`#${this.ETCO2_UNIT_ID_BASE}${scenarioId}`),
+            rrValue: monitorWidgetRootElement.querySelector(`#${this.RR_VALUE_ID_BASE}${scenarioId}`),
+            tempValue: monitorWidgetRootElement.querySelector(`#${this.TEMP_VALUE_ID_BASE}${scenarioId}`),
+            muteAlarmsBtn: monitorWidgetRootElement.querySelector(`#${this.MUTE_ALARMS_BTN_ID_BASE}${scenarioId}`),
+            pauseResumeAllBtn: monitorWidgetRootElement.querySelector(`#${this.PAUSE_ALL_BTN_ID_BASE}${scenarioId}`),
+            startNibpBtn: monitorWidgetRootElement.querySelector(`.patient-monitor-footer-controls ${this.START_NIBP_BTN_SELECTOR}`) // More specific query
         };
+        console.log(`PatientMonitor (${scenarioId}): DOM Elements Fetched - HR Value: ${!!instance.dom.hrValue}, SpO2 Value: ${!!instance.dom.spo2Value}, ECG Canvas: ${!!instance.dom.ecgCanvas}`);
 
-        // Log found elements
-        if (!instance.dom.hrValue || !instance.dom.ecgCanvas /* Add other CRITICAL checks */) {
-            console.error(`PatientMonitor (${scenarioId}): One or more critical display elements NOT FOUND in widgetElement after HTML injection!`);
+        if (!instance.dom.hrValue || !instance.dom.spo2Value || !instance.dom.ecgCanvas /* add other CRITICAL checks */) {
+            console.error(`PatientMonitor (${scenarioId}): One or more critical display elements NOT FOUND within widgetElement! Check IDs in patientMonitor.html and here. SCENARIO_ID was: ${scenarioId}`);
             monitorWidgetRootElement.innerHTML = "<p class='error-message'>Monitor critical elements missing.</p>";
-            return; // Stop if critical elements are missing
+            instance._domFullyInitialized = false; // Mark as failed
+            return;
         }
 
         // --- Initialize or Preserve Data Values ---
-        // If vitals object doesn't exist on instance, it's the first time data-wise
-        if (!instance.vitals) {
-            console.log(`PatientMonitor (${scenarioId}): First time data initialization with:`, initialVitalsFromCaller);
+        if (isFirstTimeEverForThisInstanceData) {
+            console.log(`PatientMonitor (${scenarioId}): First time DATA initialization with passed values:`, initialVitalsFromCaller);
             instance.vitals = {
                 hr: initialVitalsFromCaller.hr ?? 70,
                 spo2: initialVitalsFromCaller.spo2 ?? 98,
-                // ... (initialize ALL other vitals from initialVitalsFromCaller or defaults) ...
                 abpSys: initialVitalsFromCaller.abpSys ?? 120, abpDia: initialVitalsFromCaller.abpDia ?? 80,
                 map: initialVitalsFromCaller.map ?? this.calculateMap(initialVitalsFromCaller.abpSys ?? 120, initialVitalsFromCaller.abpDia ?? 80),
                 nbpSys: initialVitalsFromCaller.nbpSys ?? 122, nbpDia: initialVitalsFromCaller.nbpDia ?? 79,
                 nbpMap: initialVitalsFromCaller.nbpMap ?? this.calculateMap(initialVitalsFromCaller.nbpSys ?? 122, initialVitalsFromCaller.nbpDia ?? 79),
                 nbpLastReadingTime: null,
                 etco2: initialVitalsFromCaller.etco2 ?? 35,
+                etco2Unit: initialVitalsFromCaller.etco2Unit || "mmHg",
                 rr: initialVitalsFromCaller.rr ?? 16,
                 temp: initialVitalsFromCaller.temp ?? 36.9,
                 ecgRhythm: initialVitalsFromCaller.ecgRhythm || "Sinus Rhythm"
             };
-            instance.targets = { ...instance.vitals }; // Initial targets match current
+            instance.targets = { ...instance.vitals };
             instance.durations = {}; instance.changeRates = {};
-            instance.isPaused = false; instance.alarmsMuted = false;
+            instance.isPaused = false; instance.alarmsMuted = false; // Monitor's own pause/mute
 
-            // Initialize waveform config objects (only if they don't exist)
-            if (!instance.ecgWave) instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            if (!instance.plethWave) instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            if (!instance.abpWave) instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            if (!instance.etco2Wave) instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance._dataInitialized = true; // Mark data as initialized for the first time
         } else {
-            console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR: ${instance.vitals?.hr}`);
-            // Vitals data on 'instance' is already the most current.
-            // Passed initialVitalsFromCaller might be stale if this is just a tab switch.
-            // Only update from initialVitalsFromCaller if they represent a *new explicit command* (handled by setTargetVitals).
+            console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR from instance: ${instance.vitals?.hr}`);
+            // Ensure vitals object and waveform configs exist if instance was only partially created before
+            if (!instance.vitals) instance.vitals = {}; // Should not happen if above is correct
+            if (!instance.ecgWave) instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            // ... for other waves
         }
 
-        // --- Canvas Setup (if elements found) & Wave Generation (if data empty) ---
-        // This should run every time initInstance is called because canvas elements are new
-        if (instance.dom.ecgCanvas) this.setupCanvas(instance.dom.ecgCanvas, instance, 'ecgWave');
-        if (instance.dom.plethCanvas) this.setupCanvas(instance.dom.plethCanvas, instance, 'plethWave');
-        if (instance.dom.abpCanvas) this.setupCanvas(instance.dom.abpCanvas, instance, 'abpWave');
-        if (instance.dom.etco2Canvas) this.setupCanvas(instance.dom.etco2Canvas, instance, 'etco2Wave');
+        // --- Canvas Setup (Always do this after DOM elements are re-fetched for this widgetElement) ---
+        this.setupCanvas(instance.dom.ecgCanvas, instance, 'ecgWave');
+        this.setupCanvas(instance.dom.plethCanvas, instance, 'plethWave');
+        this.setupCanvas(instance.dom.abpCanvas, instance, 'abpWave');
+        this.setupCanvas(instance.dom.etco2Canvas, instance, 'etco2Wave');
 
-        // --- Button Listeners (add ONCE per unique button element) ---
-        // Since HTML is re-injected, elements are new, so listeners need to be re-attached.
-        // A simple way is to just add them. A more robust way (if elements weren't always new)
-        // would be to check for an existing listener flag.
+        // --- Button Listeners (Attach to the new DOM elements) ---
+        // To prevent multiple listeners on semantic actions if instance object persists but DOM is new:
+        // We rely on `monitorWidgetRootElement.querySelector` finding the *new* button.
         if (instance.dom.pauseResumeAllBtn) {
-            // To prevent duplicates if somehow the element wasn't new:
-            const newPauseBtn = instance.dom.pauseResumeAllBtn.cloneNode(true);
-            instance.dom.pauseResumeAllBtn.parentNode.replaceChild(newPauseBtn, instance.dom.pauseResumeAllBtn);
-            instance.dom.pauseResumeAllBtn = newPauseBtn;
-
             instance.dom.pauseResumeAllBtn.textContent = instance.isPaused ? "Resume All" : "Pause All";
-            instance.dom.pauseResumeAllBtn.addEventListener('click', () => this.togglePauseInstance(scenarioId));
+            // Remove old listener if any (more robust way if element could persist)
+            // instance.dom.pauseResumeAllBtn.replaceWith(instance.dom.pauseResumeAllBtn.cloneNode(true));
+            // instance.dom.pauseResumeAllBtn = monitorWidgetRootElement.querySelector('#' + this.PAUSE_ALL_BTN_ID_BASE + scenarioId);
+            // For simplicity, if the button is new from innerHTML, direct addEventListener is fine.
+            // If worried, add a flag like _pauseListenerAttached.
+            if (!instance.dom.pauseResumeAllBtn._listenerAttachedPM) {
+                instance.dom.pauseResumeAllBtn.addEventListener('click', () => this.togglePauseInstance(scenarioId));
+                instance.dom.pauseResumeAllBtn._listenerAttachedPM = true;
+            }
         }
         if (instance.dom.muteAlarmsBtn) {
-            const newMuteBtn = instance.dom.muteAlarmsBtn.cloneNode(true);
-            instance.dom.muteAlarmsBtn.parentNode.replaceChild(newMuteBtn, instance.dom.muteAlarmsBtn);
-            instance.dom.muteAlarmsBtn = newMuteBtn;
-
             instance.dom.muteAlarmsBtn.textContent = instance.alarmsMuted ? "Unmute Alarms" : "Mute Alarms";
-            instance.dom.muteAlarmsBtn.addEventListener('click', () => this.toggleMuteAlarms(scenarioId));
+            if (!instance.dom.muteAlarmsBtn._listenerAttachedPM) {
+                instance.dom.muteAlarmsBtn.addEventListener('click', () => this.toggleMuteAlarms(scenarioId));
+                instance.dom.muteAlarmsBtn._listenerAttachedPM = true;
+            }
         }
-        // Add other button listeners similarly (Start NIBP etc.)
+        if (instance.dom.startNibpBtn) {
+            if (!instance.dom.startNibpBtn._listenerAttachedPM) {
+                instance.dom.startNibpBtn.addEventListener('click', () => this.takeNbpReading(scenarioId));
+                instance.dom.startNibpBtn._listenerAttachedPM = true;
+            }
+        }
 
-
-        instance._domFullyInitialized = true; // Mark that DOM elements for this pass are now set up
+        instance._domFullyInitialized = true; // Mark that DOM elements specific to this widget are now set up
         this.renderInstance(scenarioId);
         console.log(`PatientMonitor (${scenarioId}): Init/refresh complete. Final Current HR from instance: ${instance.vitals?.hr}`);
     },
+
 
 
     setupCanvas: function (canvasElement, instance, waveType) {
