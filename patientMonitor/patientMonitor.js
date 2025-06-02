@@ -172,7 +172,7 @@ const patientMonitor = {
             }
 
             canvasElement.width = canvasElement.clientWidth || window.innerWidth - 100 || 800; // Default to 800 if clientWidth is zero
-            canvasElement.height = canvasElement.clientHeight || window.innerWidth / 6 || 100;
+            canvasElement.height = canvasElement.clientHeight || window.innerWidth / 12 || 100;
 
             if (canvasElement.height > 0) {
                 waveConfig.yOffset = canvasElement.height / 2;
