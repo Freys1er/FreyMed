@@ -107,7 +107,7 @@ const patientMonitor = {
             instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
             instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
             instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 8.0, amplitude: 0, yOffset: 0 };
+            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 4.0, amplitude: 0, yOffset: 0 };
             instance._dataInitialized = true; // Mark data as initialized for the first time
         } else {
             console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR from instance: ${instance.vitals?.hr}`);
@@ -172,7 +172,7 @@ const patientMonitor = {
             }
 
             canvasElement.width = canvasElement.clientWidth || window.innerWidth - 100 || 800; // Default to 800 if clientWidth is zero
-            canvasElement.height = canvasElement.clientHeight || window.innerWidth / 12 || 100;
+            canvasElement.height = canvasElement.clientHeight || 100;
 
             if (canvasElement.height > 0) {
                 waveConfig.yOffset = canvasElement.height / 2;
@@ -588,7 +588,7 @@ const patientMonitor = {
         const scrollFactor = effectiveRate * waveConfig.scrollSpeedFactor * 0.008;
         const pointsToAdvanceThisFrame = scrollFactor;
 
-        const stepX = 2;
+        const stepX = 1.8;
         let firstPoint = true;
 
         for (let i = 0; i < canvasEl.width; i++) {
