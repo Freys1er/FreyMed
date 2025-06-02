@@ -104,10 +104,10 @@ const patientMonitor = {
             instance.durations = {}; instance.changeRates = {};
             instance.isPaused = false; instance.alarmsMuted = false; // Monitor's own pause/mute
 
-            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
-            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 1.0, amplitude: 0, yOffset: 0 };
+            instance.ecgWave = { data: [], index: 0, scrollSpeedFactor: 10, amplitude: 1, yOffset: 0 };
+            instance.plethWave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
+            instance.abpWave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
+            instance.etco2Wave = { data: [], index: 0, scrollSpeedFactor: 4, amplitude: 0, yOffset: 0 };
             instance._dataInitialized = true; // Mark data as initialized for the first time
         } else {
             console.log(`PatientMonitor (${scenarioId}): Re-activating. Preserving existing instance data. Current HR from instance: ${instance.vitals?.hr}`);
@@ -197,9 +197,51 @@ const patientMonitor = {
     // --- Waveform Generation Placeholder Functions ---
     generateECGWave: function (instance) {
         const waveConfig = instance.ecgWave;
-        waveConfig.data = []; const len = 120; // Longer cycle for ECG
-        for (let i = 0; i < len; i++) { // Placeholder: simple sine wave for ECG
-            waveConfig.data.push(waveConfig.yOffset - Math.sin(i / (len / (2 * Math.PI * 4))) * waveConfig.amplitude * 0.8); // Two cycles
+        waveConfig.data = [];
+        const len = 300; // Increased length for a more detailed cycle
+        const sampleRate = 100; // Number of data points per "second" of ECG
+        const totalDuration = len / sampleRate; // Total duration in "seconds"
+
+        for (let i = 0; i < len; i++) {
+            const t = i / sampleRate; // Time in "seconds"
+
+            let y = waveConfig.yOffset; // Start at the baseline
+
+            // P wave (atrial depolarization)
+            // A small, rounded wave
+            const pWaveStart = 0;
+            const pWaveEnd = 0.2;
+            if (t >= pWaveStart && t <= pWaveEnd) {
+                y -= 0.1 * waveConfig.amplitude * Math.sin(Math.PI * (t - pWaveStart) / (pWaveEnd - pWaveStart));
+            }
+
+            // QRS complex (ventricular depolarization)
+            // A rapid, sharp deflection consisting of Q, R, and S waves
+            const qrsStart = 0.3;
+            const qrsEnd = 0.5;
+            if (t >= qrsStart && t <= qrsEnd) {
+                const q = 0.1; // Q wave duration
+                const r = 0.1; // R wave duration
+                const s = 0.1; // S wave duration
+
+                if (t < qrsStart + q) { // Q wave (downward)
+                    y += 0.25 * waveConfig.amplitude * (t - qrsStart) / q;
+                } else if (t < qrsStart + q + r) { // R wave (sharp upward peak)
+                    y -= waveConfig.amplitude * Math.sin(Math.PI * (t - (qrsStart + q)) / r);
+                } else if (t < qrsStart + q + r + s) { // S wave (downward after R)
+                    y += 0.3 * waveConfig.amplitude * Math.sin(Math.PI * (t - (qrsStart + q + r)) / s);
+                }
+            }
+
+            // T wave (ventricular repolarization)
+            // A broader, asymmetric upward wave
+            const tWaveStart = 0.7;
+            const tWaveEnd = 1;
+            if (t >= tWaveStart && t <= tWaveEnd) {
+                y -= 0.1 * waveConfig.amplitude * (1 - Math.cos(Math.PI * (t - tWaveStart) / (tWaveEnd - tWaveStart)));
+            }
+
+            waveConfig.data.push(y);
         }
         console.log(`PatientMonitor (${instance.scenarioId}): ECG wave generated.`);
     },
