@@ -593,7 +593,7 @@ const patientMonitor = {
         // It's defined as a multiplier of the pulse's visual width.
         // For example: if 1, spacing is equal to pulse width. If 0.5, spacing is half pulse width.
         // To INCREASE the space between pulses, INCREASE this value.
-        const spacingMultiplier = 0.3; // For example, 2 means the gap is twice the width of the pulse.
+        const spacingMultiplier = 60 / effectiveRate + 0.4; // For example, 2 means the gap is twice the width of the pulse.
         // You can derive this from 'rate' if you want it rate-dependent.
         // const spacingMultiplier = (1 / effectiveRate) - 1; // Example for rate dependency
 
