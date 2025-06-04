@@ -9,6 +9,12 @@ const animations = {
     // Beep Timing State
     _timeSinceLastBeepMs: 0,
     _currentBeepIntervalMs: 1000, // Default to 60 BPM (1 beep per second)
+
+    
+    _timeSinceLastAlarmMs: 0,
+    _currentAlarmIntervalMs: 2000, // Default to 60 BPM (1 beep per second)
+
+
     _lastBeepLogicTimestamp: 0,   // Timestamp of the last frame beep logic was run
 
     // Logic Update Timing
@@ -17,7 +23,7 @@ const animations = {
 
     frameCount: 0,
 
-    updateDisplaysAndAnimationsLoop: function() {
+    updateDisplaysAndAnimationsLoop: function () {
         const self = this;
         self.frameCount++;
 
@@ -90,14 +96,14 @@ const animations = {
                 // --- 3. Heart Rate Beep Logic (for the scenarioContextId) ---
                 // This is the critical section for beeps.
                 const monitorInstanceForBeep = window.patientMonitor?.instances[scenarioContextId]; // Get the whole monitor instance
-                
+
                 // Log state for beeping decision every ~second
                 if (self.frameCount % 60 === 0) {
                     console.log(`ANIM_BeepCheck (${scenarioContextId}): ` +
-                                `MonitorInstance: ${!!monitorInstanceForBeep}, ` +
-                                `HR: ${monitorInstanceForBeep?.vitals?.hr}, ` +
-                                `ScenarioPaused: ${scenarioToDisplayTimeFor?.isPaused}, ` +
-                                `MonitorWidgetPaused: ${monitorInstanceForBeep?.isPaused}`);
+                        `MonitorInstance: ${!!monitorInstanceForBeep}, ` +
+                        `HR: ${monitorInstanceForBeep?.vitals?.hr}, ` +
+                        `ScenarioPaused: ${scenarioToDisplayTimeFor?.isPaused}, ` +
+                        `MonitorWidgetPaused: ${monitorInstanceForBeep?.isPaused}`);
                 }
 
                 if (monitorInstanceForBeep && monitorInstanceForBeep.vitals && monitorInstanceForBeep.vitals.hr > 0 &&
@@ -107,11 +113,18 @@ const animations = {
                     self._currentBeepIntervalMs = (60 / monitorInstanceForBeep.vitals.hr) * 1000;
                     const deltaBeepLogicTimeMs = self._lastBeepLogicTimestamp ? (now - self._lastBeepLogicTimestamp) : (1000 / 60); // Approx 16ms for 60fps
                     self._timeSinceLastBeepMs += deltaBeepLogicTimeMs;
+                    self._timeSinceLastAlarmMs += deltaBeepLogicTimeMs;
 
                     if (self._timeSinceLastBeepMs >= self._currentBeepIntervalMs) {
                         // console.log(`AnimationsJS: PLAYING BEEP! Scenario: ${scenarioContextId}, HR: ${monitorInstanceForBeep.vitals.hr}, Interval: ${self._currentBeepIntervalMs.toFixed(0)}`);
-                        audioManager.playBeep(); // Directly call the global audioManager
+                        const pitch = (monitorInstanceForBeep.vitals.spo2 - 90) / 4; // Round to nearest 10 for better audio
+                        audioManager.playBeep(pitch); // Directly call the global audioManager
                         self._timeSinceLastBeepMs %= self._currentBeepIntervalMs;
+                    }
+                    if (self._timeSinceLastAlarmMs >= self._currentAlarmIntervalMs && monitorInstanceForBeep.vitals.spo2 < 90) {
+                        // console.log(`AnimationsJS: PLAYING BEEP! Scenario: ${scenarioContextId}, HR: ${monitorInstanceForBeep.vitals.hr}, Interval: ${self._currentBeepIntervalMs.toFixed(0)}`);
+                        audioManager.playAlarm(1); // Directly call the global audioManager
+                        self._timeSinceLastAlarmMs %= self._currentAlarmIntervalMs;
                     }
                 } else {
                     self._timeSinceLastBeepMs = 0; // Reset if no HR, or scenario paused, or monitor widget paused
@@ -138,7 +151,7 @@ const animations = {
         self._animationFrameId = requestAnimationFrame(self.updateDisplaysAndAnimationsLoop.bind(this));
     },
 
-    startAnimationLoop: function() {
+    startAnimationLoop: function () {
         if (this._animationFrameId) {
             console.log("AnimationsJS: Animation loop already running.");
             return;
@@ -151,7 +164,7 @@ const animations = {
         this._animationFrameId = requestAnimationFrame(this.updateDisplaysAndAnimationsLoop.bind(this));
     },
 
-    stopAnimationLoop: function() {
+    stopAnimationLoop: function () {
         if (this._animationFrameId) {
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
@@ -159,7 +172,7 @@ const animations = {
         }
     },
 
-    resetDisplayOptimizationFlags: function() {
+    resetDisplayOptimizationFlags: function () {
         this._lastDisplayedScenarioTime = -1;
         this._lastDisplayedScenarioPauseState = null;
         this._timeSinceLastBeepMs = 0; // Reset beep timer on significant changes too

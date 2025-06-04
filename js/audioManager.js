@@ -1,104 +1,270 @@
-// js/audioManager.js
+// audioManager.js
+// This module manages audio playback using Tone.js, generating sounds with Tone.Synth.
+// It provides reliable pitch control (frequency change) and options for duration and looping.
+// This approach avoids external file loading issues.
+// Ensure Tone.js is loaded in your HTML before this script, e.g.:
+// <script src="https://unpkg.com/tone@15.1.22/build/Tone.js"></script>
+
 const audioManager = {
-    beepSounds: [], // Array to hold all beep sound Audio objects
-    isBeepLoaded: false, // Flag to indicate if all sounds are loaded
-    loadedCount: 0,      // Counter for successfully loaded sounds
-    totalSounds: 7,      // Total number of sounds (0 to 6 inclusive)
-    audioContext: null,  // For more advanced audio if needed, not strictly for simple beep
+    // Properties for the 'beep' sound
+    beepSynth: null, // Tone.Synth instance for generating the beep sound
+    beepIsPlaying: false, // Flag to track if beep sound is currently playing
+    _beepLoop: null, // Internal Tone.Loop instance for continuous beep playback
 
-    init: function () {
+    // Properties for the 'alarm' sound
+    alarmSynth: null, // Tone.Synth instance for generating the alarm sound
+    alarmIsPlaying: false, // Flag to track if alarm sound is currently playing
+    _alarmLoop: null, // Internal Tone.Loop instance for continuous alarm playback
+
+    messageElement: null, // Element to display messages (optional, for debugging/feedback)
+    baseFrequency: 440, // A4 note, 440 Hz, as a base for pitch calculations
+
+    /**
+     * Initializes the AudioManager, setting up Tone.js and both Tone.Synth instances.
+     * This should be called once when the application starts.
+     * @param {HTMLElement} [messageEl=null] - Optional: An HTML element to display log messages.
+     */
+    init: async function (messageEl = null) {
+        this.messageElement = messageEl;
+        this.logMessage("AudioManager: Initializing Tone.Synths for sound generation...");
+
         try {
-            // Try to create AudioContext for future-proofing and overcoming autoplay restrictions
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            console.log("AudioManager: AudioContext initialized.");
-        } catch (e) {
-            console.warn("AudioManager: Web Audio API is not supported in this browser.", e);
-        }
-
-        this.beepSounds = [];
-        this.loadedCount = 0;
-        this.isBeepLoaded = false;
-
-        // Load sounds from 0 to 6 (inclusive)
-        for (let i = 0; i < this.totalSounds; i++) {
-            const audioPath = `assets/sounds/monitor_beep_single_${i}.wav`;
-            const beepSound = new Audio(audioPath);
-            beepSound.preload = 'auto'; // Preload the sound for better performance
-
-            // Event listener for when the audio can play through
-            beepSound.oncanplaythrough = () => {
-                this.loadedCount++;
-                console.log(`AudioManager: Sound ${i} loaded. Loaded count: ${this.loadedCount}/${this.totalSounds}`);
-                if (this.loadedCount === this.totalSounds) {
-                    this.isBeepLoaded = true;
-                    console.log("AudioManager: All beep sounds loaded.");
+            // Initialize the 'beep' synth
+            this.beepSynth = new Tone.Synth({
+                oscillator: {
+                    type: 'sine' // Using a sine wave for a softer, classic beep sound
+                },
+                envelope: {
+                    attack: 0.005, // Very fast attack
+                    decay: 0.2,   // Short decay
+                    sustain: 0,   // No sustain
+                    release: 0.005 // Fast release
                 }
-            };
+            }).toDestination(); // Connect the beep synth directly to the speakers
 
-            // Event listener for errors during loading
-            beepSound.onerror = (e) => {
-                console.error(`AudioManager: Error loading beep sound ${i} from ${audioPath}.`, e);
-                // Even if one fails, we still try to load others.
-                // You might want to handle this more robustly, e.g., mark specific sound as failed.
-            };
+            // Initialize the 'alarm' synth with different settings
+            this.alarmSynth = new Tone.Synth({
+                oscillator: {
+                    type: 'sine' // Using a sawtooth wave for a harsher, alarm-like sound
+                },
+                envelope: {
+                    attack: 0.002,  // Slightly slower attack for a ramp-up
+                    decay: 0.4,    // Longer decay
+                    sustain: 0.05,  // Sustained sound
+                    release: 1   // Noticeable release
+                }
+            }).toDestination(); // Connect the alarm synth directly to the speakers
 
-            // Attempt to load the sound
-            beepSound.load();
-            this.beepSounds.push(beepSound);
+            this.logMessage("AudioManager: Tone.Synths ready.");
+
+        } catch (e) {
+            console.error("AudioManager: Error initializing Tone.js or Tone.Synths.", e);
+            this.logMessage(`AudioManager: Critical error during initialization: ${e.message}`, true);
         }
     },
 
     /**
-     * Plays a specific beep sound based on the tone.
-     * Handles user interaction requirement for audio playback.
-     * @param {number} tone - The tone level (0 for low, 6 for high). Defaults to 6.
+     * Plays a generated 'beep' sound with a specific pitch, duration, and looping option.
+     * The pitch is adjusted by changing the frequency of the Tone.Synth.
+     * @param {number} pitchSemitones - The desired pitch shift in semitones (e.g., -12 for an octave down, 12 for an octave up). Defaults to 0.
+     * @param {number} [durationSeconds=0.5] - How long each individual note should play in seconds.
+     * @param {boolean} [loop=false] - Whether the sound should loop continuously.
      */
-    playBeep: function (tone = 6) {
-        // Ensure tone is within the valid range [0, 6]
-        const selectedTone = Math.max(0, Math.min(6, tone));
-
-        // Get the specific beep sound to play
-        const beepSoundToPlay = this.beepSounds[selectedTone];
-
-        if (!beepSoundToPlay) {
-            console.warn(`AudioManager: No sound found for tone ${selectedTone}.`);
+    playBeep: async function (pitchSemitones = 0, durationSeconds = 0.5, loop = false) {
+        if (!this.beepSynth) {
+            this.logMessage("AudioManager: Beep Synth not initialized. Cannot play.", true);
             return;
         }
 
-        // Resume AudioContext if it was suspended (common browser policy)
-        if (this.audioContext && this.audioContext.state === 'suspended') {
-            this.audioContext.resume().then(() => {
-                console.log("AudioManager: AudioContext resumed on user interaction.");
-                this._doPlayBeep(beepSoundToPlay);
-            }).catch(error => {
-                console.error("AudioManager: Failed to resume AudioContext.", error);
-            });
+        // Ensure Tone.js AudioContext is running (active state).
+        if (Tone.context.state === 'suspended') {
+            try {
+                await Tone.start();
+                this.logMessage("AudioManager: Tone.js AudioContext resumed on user interaction.");
+            } catch (error) {
+                this.logMessage(`AudioManager: Failed to resume Tone.js AudioContext. Error: ${error.message}`, true);
+                return;
+            }
+        }
+
+        // Stop any currently playing beep sound before starting a new one
+        //this.stopBeep();
+
+        // Calculate the target frequency based on the base frequency and semitones.
+        const targetFrequency = this.baseFrequency * Math.pow(2, pitchSemitones / 12);
+
+        // Clamp the frequency to a reasonable audible range.
+        const clampedFrequency = Math.max(50, Math.min(10000, targetFrequency));
+
+        this.logMessage(`AudioManager: Playing generated beep at frequency ${clampedFrequency.toFixed(2)} Hz (from ${pitchSemitones} semitones), Duration: ${durationSeconds}s, Loop: ${loop}.`);
+
+        // If looping, set up a Tone.Loop to repeatedly trigger the synth.
+        if (loop) {
+            // Dispose of existing loop if it's from a previous configuration
+            if (this._beepLoop) {
+                this._beepLoop.dispose();
+            }
+            // Create a new loop instance
+            this._beepLoop = new Tone.Loop(time => {
+                this.beepSynth.triggerAttackRelease(clampedFrequency, durationSeconds, time);
+            }, durationSeconds); // The loop interval is the same as the note duration
+
+            this._beepLoop.start(0); // Start the loop immediately
+            Tone.Transport.start(); // Start Tone.Transport for the loop to run
+            this.beepIsPlaying = true;
         } else {
-            this._doPlayBeep(beepSoundToPlay);
+            // For non-looping, just trigger once
+            this.beepSynth.triggerAttackRelease(clampedFrequency, durationSeconds, Tone.context.currentTime);
+            this.beepIsPlaying = true;
+            // Schedule to update isPlaying flag after the sound finishes
+            Tone.Transport.scheduleOnce(() => {
+                this.beepIsPlaying = false;
+                this.logMessage("AudioManager: Generated beep playback finished.");
+            }, Tone.context.currentTime + durationSeconds);
         }
     },
 
     /**
-     * Internal function to handle the actual playing of a beep sound.
-     * @param {HTMLAudioElement} beepSound - The Audio object to play.
+     * Plays a generated 'alarm' sound with a specific pitch, duration, and looping option.
+     * The pitch is adjusted by changing the frequency of the Tone.Synth.
+     * @param {number} pitchSemitones - The desired pitch shift in semitones (e.g., -12 for an octave down, 12 for an octave up). Defaults to 0.
+     * @param {number} [durationSeconds=1.0] - How long each individual note should play in seconds. Defaulted longer for alarm.
+     * @param {boolean} [loop=true] - Whether the sound should loop continuously. Defaulted to true for alarm.
      */
-    _doPlayBeep: function (beepSound) {
-        // Check if all sounds are loaded before attempting to play
-        if (this.isBeepLoaded && beepSound) {
-            beepSound.currentTime = 0; // Rewind to start if playing again quickly
-            beepSound.play().catch(error => {
-                // Autoplay policies might prevent playback until user interacts with the page.
-                // This is a common and expected error if no prior user interaction occurred.
-                console.warn("AudioManager: Beep playback failed, possibly due to autoplay policy or other error.", error);
-            });
-        } else if (!this.isBeepLoaded) {
-            console.warn("AudioManager: All beep sounds not loaded yet. Cannot play.");
+    playAlarm: async function (pitchSemitones = 0, durationSeconds = 1.0, loop = true) {
+        if (!this.alarmSynth) {
+            this.logMessage("AudioManager: Alarm Synth not initialized. Cannot play.", true);
+            return;
+        }
+
+        // Ensure Tone.js AudioContext is running (active state).
+        if (Tone.context.state === 'suspended') {
+            try {
+                await Tone.start();
+                this.logMessage("AudioManager: Tone.js AudioContext resumed on user interaction.");
+            } catch (error) {
+                this.logMessage(`AudioManager: Failed to resume Tone.js AudioContext. Error: ${error.message}`, true);
+                return;
+            }
+        }
+
+        // Stop any currently playing alarm sound before starting a new one
+        //this.stopAlarm();
+
+        // Calculate the target frequency based on the base frequency and semitones.
+        const targetFrequency = this.baseFrequency * Math.pow(2, pitchSemitones / 12);
+
+        // Clamp the frequency to a reasonable audible range.
+        const clampedFrequency = Math.max(50, Math.min(10000, targetFrequency));
+
+        this.logMessage(`AudioManager: Playing generated alarm at frequency ${clampedFrequency.toFixed(2)} Hz (from ${pitchSemitones} semitones), Duration: ${durationSeconds}s, Loop: ${loop}.`);
+
+        // If looping, set up a Tone.Loop to repeatedly trigger the synth.
+        if (loop) {
+            // Dispose of existing loop if it's from a previous configuration
+            if (this._alarmLoop) {
+                this._alarmLoop.dispose();
+            }
+            // Create a new loop instance
+            this._alarmLoop = new Tone.Loop(time => {
+                this.alarmSynth.triggerAttackRelease(clampedFrequency, durationSeconds, time);
+            }, durationSeconds); // The loop interval is the same as the note duration
+
+            this._alarmLoop.start(0); // Start the loop immediately
+            Tone.Transport.start(); // Start Tone.Transport for the loop to run
+            this.alarmIsPlaying = true;
+        } else {
+            // For non-looping, just trigger once
+            this.alarmSynth.triggerAttackRelease(clampedFrequency, durationSeconds, Tone.context.currentTime);
+            this.alarmIsPlaying = true;
+            // Schedule to update isPlaying flag after the sound finishes
+            Tone.Transport.scheduleOnce(() => {
+                this.alarmIsPlaying = false;
+                this.logMessage("AudioManager: Generated alarm playback finished.");
+            }, Tone.context.currentTime + durationSeconds);
+        }
+    },
+
+    /**
+     * Stops the currently playing 'beep' sound.
+     */
+    stopBeep: function () {
+        if (this.beepSynth && this.beepIsPlaying) {
+            this.beepSynth.triggerRelease(); // Stop any active notes
+            if (this._beepLoop && this._beepLoop.state === 'started') {
+                this._beepLoop.stop();
+            }
+            this.beepIsPlaying = false;
+            this.logMessage("AudioManager: Generated beep playback stopped.");
+            // Stop Tone.Transport only if no other sounds are playing
+            if (!this.alarmIsPlaying) {
+                Tone.Transport.stop();
+            }
+        }
+    },
+
+    /**
+     * Stops the currently playing 'alarm' sound.
+     */
+    stopAlarm: function () {
+        if (this.alarmSynth && this.alarmIsPlaying) {
+            this.alarmSynth.triggerRelease(); // Stop any active notes
+            if (this._alarmLoop && this._alarmLoop.state === 'started') {
+                this._alarmLoop.stop();
+            }
+            this.alarmIsPlaying = false;
+            this.logMessage("AudioManager: Generated alarm playback stopped.");
+            // Stop Tone.Transport only if no other sounds are playing
+            if (!this.beepIsPlaying) {
+                Tone.Transport.stop();
+            }
+        }
+    },
+
+    /**
+     * Disposes of Tone.js objects to free up resources.
+     * Call this when your application is shutting down or no longer needs audio.
+     */
+    dispose: function () {
+        //this.stopBeep(); // Ensure beep sound is stopped before disposing
+        //this.stopAlarm(); // Ensure alarm sound is stopped before disposing
+
+        if (this.beepSynth) {
+            this.beepSynth.dispose();
+            this.beepSynth = null;
+        }
+        if (this._beepLoop) {
+            this._beepLoop.dispose();
+            this._beepLoop = null;
+        }
+
+        if (this.alarmSynth) {
+            this.alarmSynth.dispose();
+            this.alarmSynth = null;
+        }
+        if (this._alarmLoop) {
+            this._alarmLoop.dispose();
+            this._alarmLoop = null;
+        }
+
+        this.logMessage("AudioManager: Disposed Tone.js resources.");
+    },
+
+    /**
+     * Logs messages to the console and an optional message box.
+     * @param {string} message - The message to log.
+     * @param {boolean} isError - True if this is an error message.
+     */
+    logMessage: function (message, isError = false) {
+        console.log(message);
+        if (this.messageElement) {
+            this.messageElement.classList.remove('hidden');
+            const timestamp = new Date().toLocaleTimeString();
+            this.messageElement.innerHTML += `<p class="${isError ? 'text-red-700' : 'text-gray-700'}">[${timestamp}] ${message}</p>`;
+            this.messageElement.scrollTop = this.messageElement.scrollHeight; // Scroll to bottom
         }
     }
 };
 
-// Initialize audio manager when the script loads.
-// User interaction might be needed later to fully enable audio.
-// It's recommended to call audioManager.init() from your main application script
-// after the DOM is fully loaded, e.g., in a DOMContentLoaded listener.
+// Expose audioManager globally for use in other scripts
 window.audioManager = audioManager;

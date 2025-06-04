@@ -314,16 +314,15 @@ const patientMonitor = {
         waveConfig.data = [];
 
         // Define lengths for each phase of the EtCO2 waveform
-        const totalCycleLength = 100; // Total points in one complete breath cycle
-        const baselineLength = 20;   // Phase I: Flat baseline (inspiratory)
-        const upstrokeLength = 10;   // Phase II: Rapid rise (expiratory upstroke)
-        const plateauLength = 40;    // Phase III: Alveolar plateau
-        const downstrokeLength = 5; // Phase IV: Rapid fall (inspiratory downstroke)
+        const baselineLength = 5;   // Phase I: Flat baseline (inspiratory)
+        const upstrokeLength = 2;   // Phase II: Rapid rise (expiratory upstroke)
+        const plateauLength = 50;    // Phase III: Alveolar plateau
+        const downstrokeLength = 2; // Phase IV: Rapid fall (inspiratory downstroke)
 
         // Ensure phases add up to totalCycleLength (or adjust totalCycleLength)
         // For demonstration, these add up to 100: 20+15+45+20 = 100
 
-        for (let i = 0; i < totalCycleLength; i++) {
+        for (let i = 0; i < baselineLength + upstrokeLength + plateauLength + downstrokeLength; i++) {
             let y_norm = 0; // Normalized Y value (0 at baseline, 1 at peak)
 
             if (i < baselineLength) {
@@ -573,46 +572,142 @@ const patientMonitor = {
      * @param {string} color
      * @param {number} rateForSpeed - e.g., HR or RR to influence scroll speed
      */
-    drawWave: function (canvasEl, waveConfig, color, rateForSpeed) {
+    drawWave: function (canvasEl, waveConfig, color, rate) {
         if (!canvasEl || !waveConfig || !waveConfig.data || waveConfig.data.length === 0) return;
         const ctx = canvasEl.getContext('2d');
         if (!ctx) return;
 
-        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-        ctx.strokeStyle = color;
+        const width = canvasEl.width;
+        const height = canvasEl.height;
+
+        const pointsInOneCycle = waveConfig.data.length;
+        const effectiveRate = rate;
+
+        // --- Core Spacing Parameters ---
+        // 1. How much each *actual data point* from waveConfig.data contributes to horizontal space.
+        // INCREASE this to make the *pulses themselves* wider, thus fewer pulses on screen.
+        const pixelsPerDataPoint = 3; // Start with a noticeable value, like 5 or 10, to see the effect.
+
+        // 2. How much additional blank space (gap) there is after each pulse.
+        // This is the primary control for the *gap between pulses*.
+        // It's defined as a multiplier of the pulse's visual width.
+        // For example: if 1, spacing is equal to pulse width. If 0.5, spacing is half pulse width.
+        // To INCREASE the space between pulses, INCREASE this value.
+        const spacingMultiplier = 0.3; // For example, 2 means the gap is twice the width of the pulse.
+        // You can derive this from 'rate' if you want it rate-dependent.
+        // const spacingMultiplier = (1 / effectiveRate) - 1; // Example for rate dependency
+
+
+        // Calculate the effective visual length of one pulse on the canvas
+        const visualPulseLength = pointsInOneCycle * pixelsPerDataPoint;
+
+        // Calculate the effective visual length of the spacing on the canvas
+        const visualSpacingLength = visualPulseLength * spacingMultiplier;
+
+        // The total visual length of one complete pulse + gap cycle on the canvas
+        const totalVisualCycleLength = visualPulseLength + visualSpacingLength;
+
+
+        // --- CRT Monitor Effect Parameters ---
+        const scanSpeed = pixelsPerDataPoint; // How many pixels the "eraser/drawing head" moves per frame (increase for faster scan)
+        const eraserWidth = 10; // Width of the "black box" eraser
+        const scanLineColor = color; // Color of the actively drawn line
+        const fadeAmount = 0.01; // How much the *entire canvas* fades per frame (for persistence, smaller is slower)
+        const backgroundColor = 'black'; // The color the canvas fades towards
+
+        // Initialize scanX and waveConfig.index if they don't exist
+        if (typeof waveConfig.scanX === 'undefined') {
+            waveConfig.scanX = 0;
+        }
+        if (typeof waveConfig.index === 'undefined') { // This `index` tracks our position within the *visual* waveform
+            waveConfig.index = 0;
+        }
+
+        // --- Core CRT Scan Logic ---
+
+        // 1. Apply a subtle fade to the entire canvas for persistence
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = `rgba(0, 0, 0, ${fadeAmount})`;
+        ctx.fillRect(0, 0, width, height);
+
+        // 2. Move the "eraser" (clear a small rectangle)
+        ctx.clearRect(waveConfig.scanX, 0, eraserWidth, height);
+
+        // 3. Draw the new segment of the waveform
+        ctx.strokeStyle = scanLineColor;
         ctx.lineWidth = 2;
         ctx.beginPath();
 
-        const pointsInOneCycle = waveConfig.data.length;
-        const effectiveRate = rateForSpeed; // Use a sensible default if rate is 0/undefined
-        const scrollFactor = effectiveRate * waveConfig.scrollSpeedFactor * 0.008;
-        const pointsToAdvanceThisFrame = scrollFactor;
+        const x = waveConfig.scanX; // Current X position on the canvas
 
-        const stepX = 1.8;
-        let firstPoint = true;
+        // Calculate the position within the *totalVisualCycleLength*
+        // waveConfig.index now represents our scroll position in *visual pixels*
+        const currentVisualPositionInCycle = (waveConfig.index + x) % totalVisualCycleLength;
 
-        for (let i = 0; i < canvasEl.width; i++) {
-            const dataIndex = (Math.floor(waveConfig.index) + i) % pointsInOneCycle;
-            //Add noise to the y value
-            const y = waveConfig.data[dataIndex];
-            if (typeof y !== 'number') continue;
-
-            if (y === undefined || isNaN(y)) continue;
-            const x = i * stepX; // Adjust x based on scroll factor
-            //shift the waveform horizontally to compensate for the laggy movement
-            
-            if (firstPoint) { ctx.moveTo(x, y); firstPoint = false; }
-            else { ctx.lineTo(x, y); }
+        let y;
+        if (currentVisualPositionInCycle >= 0 && currentVisualPositionInCycle < visualPulseLength) {
+            // We are in the "pulse" part of the cycle
+            // Map the visual position back to the actual data index
+            const dataIndex = Math.floor(currentVisualPositionInCycle / pixelsPerDataPoint);
+            y = waveConfig.data[dataIndex % pointsInOneCycle]; // Ensure data index wraps
+        } else {
+            // We are in the "spacing" part of the cycle
+            y = height / 2; // Centered flat line for spacing
         }
+
+        if (typeof y !== 'number' || isNaN(y)) {
+            y = height / 2;
+        }
+
+        // Initialize lastY if it's the very first point or if we've just reset the scan
+        if (typeof waveConfig.lastY === 'undefined' || waveConfig.scanX === 0) {
+            // When scanX is 0, we need to correctly determine the starting Y for the new scan line.
+            // This makes sure the first segment of the new scan connects correctly.
+            // We need to look at the 'y' value at (width - scanSpeed) from the previous scan line.
+            const prevScanX = (width - scanSpeed);
+            const prevVisualPositionInCycle = (waveConfig.index + prevScanX) % totalVisualCycleLength;
+
+            let prevY;
+            if (prevVisualPositionInCycle >= 0 && prevVisualPositionInCycle < visualPulseLength) {
+                const prevDataIndex = Math.floor(prevVisualPositionInCycle / pixelsPerDataPoint);
+                prevY = waveConfig.data[prevDataIndex % pointsInOneCycle];
+            } else {
+                prevY = height / 2;
+            }
+            waveConfig.lastY = prevY;
+        }
+
+        ctx.moveTo(waveConfig.scanX - scanSpeed, waveConfig.lastY); // Start from previous point
+        ctx.lineTo(x, y); // Draw to current point
         ctx.stroke();
 
-        waveConfig.index = (waveConfig.index + pointsToAdvanceThisFrame);
-        if (waveConfig.index >= pointsInOneCycle) {
-            waveConfig.index -= pointsInOneCycle;
+        // Update lastY for the next frame
+        waveConfig.lastY = y;
+
+        // 4. Update scanX for the next frame
+        waveConfig.scanX += scanSpeed;
+
+        // 5. Reset scanX and advance waveform data if the "drawing head" hits the end
+        if (waveConfig.scanX >= width) {
+            waveConfig.scanX = 0; // Reset to the left
+
+            // Advance the underlying waveform data by the width of the canvas in terms of visual pixels.
+            // This ensures that the *next* scan starts drawing a segment of the waveform
+            // that is 'canvas.width' pixels further along the total waveform pattern.
+            waveConfig.index = (waveConfig.index + width) % totalVisualCycleLength;
+
+            // Reset lastY to the value at the new start of the scan (x=0, with the new waveConfig.index)
+            const initialVisualPositionInCycle = (waveConfig.index + 0) % totalVisualCycleLength;
+            let initialY;
+            if (initialVisualPositionInCycle >= 0 && initialVisualPositionInCycle < visualPulseLength) {
+                const dataIndex = Math.floor(initialVisualPositionInCycle / pixelsPerDataPoint);
+                initialY = waveConfig.data[dataIndex % pointsInOneCycle];
+            } else {
+                initialY = height / 2;
+            }
+            waveConfig.lastY = initialY;
         }
     },
-
-
     /**
      * Sets target vital signs for a specific scenario's monitor.
      * @param {string} scenarioId
