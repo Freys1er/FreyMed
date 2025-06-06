@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natural Selection Simulation</title>
+    <style>
+        /* --- General Setup & Typography --- */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+        :root {
+            --primary-blue: #007bff;
+            --light-blue: #54a1ff;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            --grass-green: #3a7d29;
+            --predator-red: #dc3545;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: 'Poppins', sans-serif;
+            background-color: #000;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- Intro Screen --- */
+        #intro-screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #000;
+            color: white;
+            font-size: 5vw;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        /* --- Slideshow Card System --- */
+        .card-container {
+            width: 75vw;
+            max-width: 1000px;
+            height: 85vh;
+            /* Increased height slightly for new elements */
+            max-height: 800px;
+            background: var(--card-bg);
+            border-radius: 25px;
+            box-shadow: var(--shadow);
+            padding: 30px 50px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            text-align: center;
+        }
+
+        .card-container h1 {
+            font-size: 3rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .card-container p {
+            font-size: 1.4rem;
+            /* Slightly smaller to fit more */
+            line-height: 1.6;
+            color: #555;
+            flex-grow: 1;
+        }
+
+        /* --- NEW: Small text for UI labels --- */
+        .ui-label {
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #444;
+        }
+
+        .card-container img {
+            max-height: 200px;
+            /* Adjusted size */
+            margin: 15px 0;
+            border-radius: 15px;
+        }
+
+        .capsule-button {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 15px 60px;
+            font-size: 1.8rem;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .capsule-button:hover {
+            background-color: var(--light-blue);
+            transform: translateY(-3px);
+        }
+
+        /* --- How to Play - Selectors --- */
+        .selector-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .selector-option {
+            font-size: 1.5rem;
+            padding: 15px 30px;
+            border: 3px solid var(--primary-blue);
+            color: var(--primary-blue);
+            background-color: white;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .selector-option.selected {
+            background-color: var(--primary-blue);
+            color: white;
+        }
+
+        /* --- Simulation Screen --- */
+        #simulation-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ground {
+            width: 100%;
+            height: 100%;
+            background-image: url('grass_texture.jpg');
+            /* Seamless grass texture */
+            background-size: auto;
+            position: relative;
+            transition: opacity 1s ease-out;
+        }
+
+
+        .grasshopper {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            opacity: 0.5;
+            cursor: pointer;
+            box-sizing: border-box;
+            transition: transform 0.1s ease, opacity 0.3s ease;
+        }
+
+        .grasshopper:hover {
+            transform: scale(1.5);
+        }
+
+        .grasshopper.found {
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        /* --- Simulation UI (Timer, Score, etc.) --- */
+        #sim-ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            text-shadow: 0 0 10px black;
+        }
+
+        #sim-ui h2 {
+            font-size: 2.5rem;
+            margin: 0;
+        }
+
+        #sim-message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #sim-message-overlay h1 {
+            font-size: 4rem;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        /* --- MODIFIED: Final Results Screen Styles --- */
+        #chart-legend {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+
+        .legend-color-box {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 4px;
+        }
+
+        #results-chart {
+            width: 90%;
+            height: 55%;
+            /* Adjusted height */
+            border-left: 4px solid #333;
+            border-bottom: 4px solid #333;
+            position: relative;
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+        }
+
+        .generation-bar-group {
+            display: flex;
+            gap: 5px;
+            height: 100%;
+            width: 18%;
+            align-items: flex-end;
+            position: relative;
+        }
+
+        .chart-bar {
+            width: 50%;
+            transition: height 1s ease-out;
+            position: relative;
+        }
+
+        .chart-bar.camouflage {
+            background-color: var(--grass-green);
+        }
+
+        .chart-bar.found {
+            background-color: var(--predator-red);
+        }
+
+        .bar-label {
+            position: absolute;
+            bottom: -35px;
+            width: 100%;
+            text-align: center;
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. Intro Animation Screen -->
+    <div id="intro-screen">Natural Selection</div>
+
+    <!-- 2. Slideshow Screens -->
+    <div id="slideshow-container" class="hidden">
+        <!-- Slide 1: What is Natural Selection? -->
+        <div id="slide-1" class="card-container">
+            <h1>What is Natural Selection?</h1>
+            <p>
+                Natural Selection is the process where organisms that are better adapted to their environment tend to
+                survive and produce more offspring. It's a key mechanism of <strong>evolution</strong>.
+            </p>
+            <img src="finches.jpg" alt="Darwin's Finches">
+            <button class="capsule-button" onclick="showNextSlide()">Next</button>
+        </div>
+
+        <!-- Slide 2: Meet the Grasshopper -->
+        <div id="slide-2" class="card-container hidden">
+            <h1>Meet the Grasshopper</h1>
+            <p>
+                Our simulation focuses on a population of grasshoppers. In their environment, a predator (that's you!)
+                hunts them. Which grasshoppers do you think will be most likely to survive and reproduce?
+            </p>
+            <img src="grasshopper.jpg" alt="A green grasshopper">
+            <button class="capsule-button" onclick="showNextSlide()">Next</button>
+        </div>
+
+        <!-- Slide 3: How to Play --- MODIFIED --- -->
+        <div id="slide-3" class="card-container hidden">
+            <h1>How to Play</h1>
+            <p>
+                Your goal is to find as many grasshoppers as you can. The ones you miss will "survive" to create the
+                next generation. Choose your settings below and watch how the population changes!
+            </p>
+
+            <p class="ui-label">Time Per Round:</p>
+            <div id="time-selector" class="selector-container">
+                <div class="selector-option selected" data-time="60">60 sec</div>
+                <div class="selector-option" data-time="30">30 sec</div>
+                <div class="selector-option" data-time="15">15 sec</div>
+            </div>
+
+            <!-- --- NEW: Generation Selector --- -->
+            <p class="ui-label">Number of Generations:</p>
+            <div id="generation-selector" class="selector-container">
+                <div class="selector-option" data-gens="3">3 Gens</div>
+                <div class="selector-option selected" data-gens="5">5 Gens</div>
+                <div class="selector-option" data-gens="10">10 Gens</div>
+            </div>
+
+            <button class="capsule-button" onclick="startGame()" style="margin-top: 30px;">Start Simulation</button>
+        </div>
+
+        <!-- Final Results Slide --- MODIFIED --- -->
+        <div id="slide-results" class="card-container hidden">
+            <h1>Results</h1>
+            <p>
+                This chart shows the relationship between camouflage and survival. As the generations progress, did
+                better camouflage lead to fewer grasshoppers being found?
+            </p>
+            <!-- --- NEW: Chart Legend --- -->
+            <div id="chart-legend"></div>
+            <div id="results-chart">
+                <!-- Bars will be added by JavaScript -->
+            </div>
+            <button class="capsule-button" onclick="location.reload()" style="margin-top: 40px;">Play Again</button>
+        </div>
+    </div>
+
+    <!-- 3. The Simulation -->
+    <div id="simulation-container" class="hidden">
+        <div id="ground"></div>
+        <div id="sim-ui">
+            <h2 id="timer">Time: 01:00</h2>
+            <h2 id="generation-counter">Generation: 1</h2>
+            <h2 id="score">Found: 0</h2>
+        </div>
+        <div id="sim-message-overlay" class="hidden">
+            <h1 id="message-text"></h1>
+            <button id="next-gen-button" class="capsule-button">Next</button>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Element References ---
+        const introScreen = document.getElementById('intro-screen');
+        const slideshowContainer = document.getElementById('slideshow-container');
+        const simulationContainer = document.getElementById('simulation-container');
+        const ground = document.getElementById('ground');
+        const simUI = document.getElementById('sim-ui');
+        const timerDisplay = document.getElementById('timer');
+        const generationDisplay = document.getElementById('generation-counter');
+        const scoreDisplay = document.getElementById('score');
+        const messageOverlay = document.getElementById('sim-message-overlay');
+        const messageText = document.getElementById('message-text');
+        const nextGenButton = document.getElementById('next-gen-button');
+        const timeSelector = document.getElementById('time-selector');
+        const generationSelector = document.getElementById('generation-selector'); // --- NEW ---
+
+        // --- Game State Variables ---
+        let currentSlide = 1;
+        const totalSlides = 3;
+        let population = [];
+        const populationSize = 30;
+        let gameTime = 60; // Default time in seconds
+        let timerInterval;
+        let score = 0;
+        let currentGeneration = 0;
+        let totalGenerations = 5; // --- MODIFIED to be a let ---
+        const environmentColor = { r: 109, g: 114, b: 58 }; // The "ideal" green color of the grass
+        let generationColorData = [];
+        let generationFoundData = []; // --- NEW: To store found count for the chart ---
+
+        // --- Core Functions ---
+
+        // 1. App Initialization
+        window.onload = () => {
+            introScreen.style.opacity = '1';
+            setTimeout(() => {
+                introScreen.style.opacity = '0';
+                setTimeout(() => {
+                    introScreen.classList.add('hidden');
+                    slideshowContainer.classList.remove('hidden');
+                }, 1000);
+            }, 2000);
+        };
+
+        // 2. Slideshow Navigation
+        function showNextSlide() {
+            document.getElementById(`slide-${currentSlide}`).classList.add('hidden');
+            currentSlide++;
+            if (currentSlide <= totalSlides) {
+                document.getElementById(`slide-${currentSlide}`).classList.remove('hidden');
+            }
+        }
+
+        // 3. Game Setup
+        function startGame() {
+            slideshowContainer.classList.add('hidden');
+            simulationContainer.classList.remove('hidden');
+            startNextGeneration();
+        }
+
+        function startNextGeneration() {
+            currentGeneration++;
+            score = 0;
+            messageOverlay.classList.add('hidden');
+            ground.style.opacity = 1;
+            simUI.style.opacity = 1;
+            updateUI();
+            if (currentGeneration === 1) { createInitialPopulation(); }
+            else { reproduce(); }
+            renderGrasshoppers();
+            messageText.textContent = `Generation ${currentGeneration}: Get Ready!`;
+            messageOverlay.classList.remove('hidden');
+            nextGenButton.textContent = 'Start Hunting';
+            nextGenButton.onclick = playRound;
+        }
+
+        function playRound() {
+            messageOverlay.classList.add('hidden');
+            startTimer();
+            ground.addEventListener('click', handleGrasshopperClick);
+        }
+
+        // --- MODIFIED: endRound function to store more data ---
+        function endRound() {
+            clearInterval(timerInterval);
+            ground.removeEventListener('click', handleGrasshopperClick);
+            simUI.style.opacity = 0;
+
+            // --- DATA COLLECTION ---
+            // 1. Store the number of grasshoppers found in this round
+            generationFoundData.push(score);
+
+            // 2. Calculate and store average camouflage score for survivors
+            const survivors = population.filter(g => !g.found);
+            let totalDiff = survivors.reduce((sum, s) => sum + colorDistance(s.color, environmentColor), 0);
+            const avgDiff = survivors.length > 0 ? totalDiff / survivors.length : 255 * 3;
+            generationColorData.push(255 * 3 - avgDiff); // Invert so higher is better
+
+            // --- MESSAGE & NEXT STEP ---
+            messageText.textContent = `Time's Up! You found ${score} grasshoppers.`;
+            messageOverlay.classList.remove('hidden');
+            revealSurvivors();
+
+            if (currentGeneration < totalGenerations) {
+                nextGenButton.textContent = 'Next Generation';
+                nextGenButton.onclick = startNextGeneration;
+            } else {
+                nextGenButton.textContent = 'See Results';
+                nextGenButton.onclick = showFinalResults;
+            }
+        }
+
+        function revealSurvivors() {
+            ground.style.opacity = 0.1;
+            document.querySelectorAll('.grasshopper').forEach(gh => {
+                gh.classList.remove('found');
+                gh.style.opacity = 1;
+                gh.style.pointerEvents = 'none';
+                if (!population[gh.dataset.id].found) {
+                    gh.style.border = '3px solid yellow';
+                }
+            });
+        }
+
+        // 4. Population & Evolution Logic
+        function createInitialPopulation() {
+            population = [];
+            for (let i = 0; i < populationSize; i++) {
+                population.push({
+                    id: i,
+                    color: { r: Math.random() * 256, g: Math.random() * 256, b: Math.random() * 256 },
+                    x: Math.random() * 98, y: Math.random() * 98, found: false
+                });
+            }
+        }
+
+        function reproduce() {
+            const survivors = population.filter(g => !g.found);
+            const newPopulation = [];
+            survivors.forEach((s, i) => { newPopulation.push({ ...s, id: i, found: false }); });
+
+            let newId = survivors.length;
+            while (newPopulation.length < populationSize) {
+                if (survivors.length === 0) { // Extinction event
+                    const newColor = { r: Math.random() * 256, g: Math.random() * 256, b: Math.random() * 256 };
+                    newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 98, found: false });
+                    continue;
+                }
+                const parent = survivors[Math.floor(Math.random() * survivors.length)];
+                const newColor = {
+                    r: clamp(parent.color.r + (Math.random() * 40 - 20) / currentGeneration),
+                    g: clamp(parent.color.g + (Math.random() * 40 - 20) / currentGeneration),
+                    b: clamp(parent.color.b + (Math.random() * 40 - 20) / currentGeneration)
+                };
+                newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 98, found: false });
+            }
+            population = newPopulation;
+        }
+
+        function renderGrasshoppers() {
+            ground.innerHTML = '';
+            population.forEach(gh => {
+                const ghElement = document.createElement('div');
+                ghElement.className = 'grasshopper';
+                ghElement.dataset.id = gh.id;
+                ghElement.style.left = `${gh.x}%`; ghElement.style.top = `${gh.y}%`;
+                ghElement.style.backgroundColor = `rgb(${gh.color.r}, ${gh.color.g}, ${gh.color.b})`;
+                ground.appendChild(ghElement);
+            });
+        }
+
+        // --- MODIFIED: showFinalResults function to build the double-bar graph ---
+        function showFinalResults() {
+            simulationContainer.classList.add('hidden');
+            slideshowContainer.classList.remove('hidden');
+            document.getElementById('slide-3').classList.add('hidden');
+            const resultsSlide = document.getElementById('slide-results');
+            resultsSlide.classList.remove('hidden');
+
+            const chart = document.getElementById('results-chart');
+            const legend = document.getElementById('chart-legend');
+            chart.innerHTML = '';
+            legend.innerHTML = `
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background-color: var(--grass-green);"></div> Average Camouflage
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color-box" style="background-color: var(--predator-red);"></div> Grasshoppers Found
+                </div>`;
+
+            const maxCamouflageScore = Math.max(...generationColorData);
+            const minCamouflageScore = Math.min(...generationColorData);
+
+            for (let i = 0; i < totalGenerations; i++) {
+                // Create the container for this generation's two bars
+                const group = document.createElement('div');
+                group.className = 'generation-bar-group';
+
+                // 1. Create Camouflage Bar
+                const barCamouflage = document.createElement('div');
+                barCamouflage.className = 'chart-bar camouflage';
+                const camouflageHeight = ((generationColorData[i] - minCamouflageScore) / (maxCamouflageScore - minCamouflageScore)) * 100 || 0;
+                barCamouflage.style.height = '0%';
+                setTimeout(() => { barCamouflage.style.height = `${camouflageHeight}%` }, 100);
+
+                // 2. Create Found Count Bar
+                const barFound = document.createElement('div');
+                barFound.className = 'chart-bar found';
+                const foundHeight = (generationFoundData[i] / populationSize) * 100;
+                barFound.style.height = '0%';
+                setTimeout(() => { barFound.style.height = `${foundHeight}%` }, 100);
+
+                // 3. Create Label
+                const label = document.createElement('div');
+                label.className = 'bar-label';
+                label.textContent = `Gen ${i + 1}`;
+
+                // 4. Append everything
+                group.appendChild(barCamouflage);
+                group.appendChild(barFound);
+                group.appendChild(label);
+                chart.appendChild(group);
+            }
+        }
+
+        // --- Event Handlers & Timers ---
+        function createSelectorHandler(selectorContainer, dataAttribute, updateVariableCallback) {
+            selectorContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('selector-option')) {
+                    selectorContainer.querySelectorAll('.selector-option').forEach(opt => opt.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                    updateVariableCallback(parseInt(e.target.dataset[dataAttribute], 10));
+                }
+            });
+        }
+
+        createSelectorHandler(timeSelector, 'time', (value) => gameTime = value);
+        createSelectorHandler(generationSelector, 'gens', (value) => totalGenerations = value); // --- NEW ---
+
+        function handleGrasshopperClick(event) {
+            if (event.target.classList.contains('grasshopper') && !event.target.classList.contains('found')) {
+                event.target.classList.add('found');
+                population[event.target.dataset.id].found = true;
+                score++;
+                updateUI();
+            }
+        }
+
+        function startTimer() {
+            let timeLeft = gameTime;
+            updateTimerDisplay(timeLeft); // Initial display
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay(timeLeft);
+                if (timeLeft <= 0) { endRound(); }
+            }, 1000);
+        }
+
+        // --- UI & Utility Functions ---
+        function updateUI() {
+            scoreDisplay.textContent = `Found: ${score}`;
+            generationDisplay.textContent = `Generation: ${currentGeneration}`;
+            updateTimerDisplay(gameTime);
+        }
+
+        function updateTimerDisplay(time) {
+            const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+            const seconds = (time % 60).toString().padStart(2, '0');
+            timerDisplay.textContent = `Time: ${minutes}:${seconds}`;
+        }
+
+        function clamp(value) { return Math.max(0, Math.min(255, Math.round(value))); }
+        function colorDistance(c1, c2) { return Math.sqrt(Math.pow(c1.r - c2.r, 2) + Math.pow(c1.g - c2.g, 2) + Math.pow(c1.b - c2.b, 2)); }
+    </script>
+</body>
+
+</html>
