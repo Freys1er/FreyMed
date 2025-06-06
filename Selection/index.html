@@ -503,7 +503,7 @@
                 population.push({
                     id: i,
                     color: { r: Math.random() * 256, g: Math.random() * 256, b: Math.random() * 256 },
-                    x: Math.random() * 98, y: Math.random() * 98, found: false
+                    x: Math.random() * 98, y: Math.random() * 90 + 8, found: false
                 });
             }
         }
@@ -517,7 +517,7 @@
             while (newPopulation.length < populationSize) {
                 if (survivors.length === 0) { // Extinction event
                     const newColor = { r: Math.random() * 256, g: Math.random() * 256, b: Math.random() * 256 };
-                    newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 98, found: false });
+                    newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 90 + 8, found: false });
                     continue;
                 }
                 const parent = survivors[Math.floor(Math.random() * survivors.length)];
@@ -526,7 +526,7 @@
                     g: clamp(parent.color.g + (Math.random() * 40 - 20) / currentGeneration),
                     b: clamp(parent.color.b + (Math.random() * 40 - 20) / currentGeneration)
                 };
-                newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 98, found: false });
+                newPopulation.push({ id: newId++, color: newColor, x: Math.random() * 98, y: Math.random() * 90 + 8, found: false });
             }
             population = newPopulation;
         }
@@ -545,6 +545,7 @@
 
         // --- MODIFIED: showFinalResults function to build the double-bar graph ---
         function showFinalResults() {
+            // ... (unchanged UI state management and chart/legend setup) ...
             simulationContainer.classList.add('hidden');
             slideshowContainer.classList.remove('hidden');
             document.getElementById('slide-3').classList.add('hidden');
@@ -555,34 +556,87 @@
             const legend = document.getElementById('chart-legend');
             chart.innerHTML = '';
             legend.innerHTML = `
-                <div class="legend-item">
-                    <div class="legend-color-box" style="background-color: var(--grass-green);"></div> Average Camouflage
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color-box" style="background-color: var(--predator-red);"></div> Grasshoppers Found
-                </div>`;
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: var(--grass-green);"></div> Average Camouflage
+        </div>
+        <div class="legend-item">
+            <div class="legend-color-box" style="background-color: var(--predator-red);"></div> Grasshoppers Found
+        </div>`;
 
+            if (generationColorData.length === 0 || generationFoundData.length === 0) {
+                console.warn("Generation data is empty. Cannot render chart.");
+                return;
+            }
+
+            // --- Camouflage Data Pre-processing (Logarithmic Scale) ---
             const maxCamouflageScore = Math.max(...generationColorData);
             const minCamouflageScore = Math.min(...generationColorData);
+            const C_camouflage = 1; // Constant for camouflage log transform
+            const logMinScore = Math.log(minCamouflageScore + C_camouflage);
+            const logMaxScore = Math.log(maxCamouflageScore + C_camouflage);
+            const logScoreRange = logMaxScore - logMinScore;
 
+
+            // --- Grasshoppers Found Data Pre-processing (Power Curve) ---
+            // The maximum possible value for found grasshoppers is populationSize
+            const maxFoundValue = populationSize;
+            const minFoundValue = 0; // Grasshoppers found can naturally be 0
+
+            // Adjust this power value to control the curve.
+            // 0.5 = square root (gentle curve)
+            // 0.3 = stronger curve (more compression at higher values)
+            const foundPower = 0.3; // Experiment with values like 0.25, 0.3, 0.5
+
+            // Calculate the transformed min and max for scaling
+            const transformedMinFound = Math.pow(minFoundValue, foundPower); // Will be 0 if minFoundValue is 0
+            const transformedMaxFound = Math.pow(maxFoundValue, foundPower);
+            const transformedFoundRange = transformedMaxFound - transformedMinFound;
+
+
+            // --- Chart Bar Generation Loop ---
             for (let i = 0; i < totalGenerations; i++) {
-                // Create the container for this generation's two bars
                 const group = document.createElement('div');
                 group.className = 'generation-bar-group';
 
-                // 1. Create Camouflage Bar
+                // 1. Create Camouflage Bar (Logarithmic Scale - Unchanged)
                 const barCamouflage = document.createElement('div');
                 barCamouflage.className = 'chart-bar camouflage';
-                const camouflageHeight = ((generationColorData[i] - minCamouflageScore) / (maxCamouflageScore - minCamouflageScore)) * 100 || 0;
-                barCamouflage.style.height = '0%';
-                setTimeout(() => { barCamouflage.style.height = `${camouflageHeight}%` }, 100);
+                const rawCamouflageScore = generationColorData[i];
 
-                // 2. Create Found Count Bar
+                const logTransformedCamouflageScore = Math.log(rawCamouflageScore + C_camouflage);
+                let camouflageHeight;
+                if (logScoreRange === 0) {
+                    camouflageHeight = 0;
+                } else {
+                    camouflageHeight = ((logTransformedCamouflageScore - logMinScore) / logScoreRange) * 100;
+                }
+                camouflageHeight = Math.max(0, Math.min(100, camouflageHeight)) || 0;
+                barCamouflage.style.height = '0%';
+                setTimeout(() => { barCamouflage.style.height = `${camouflageHeight}%`; }, 100 + (i * 20));
+
+
+                // 2. Create Found Count Bar (Power Curve Scale - MODIFIED)
                 const barFound = document.createElement('div');
                 barFound.className = 'chart-bar found';
-                const foundHeight = (generationFoundData[i] / populationSize) * 100;
+                const rawFoundCount = generationFoundData[i]; // Actual number found for this generation
+
+                // Apply the power transformation
+                const transformedFoundCount = Math.pow(rawFoundCount, foundPower);
+
+                let foundHeight;
+                if (transformedFoundRange === 0) {
+                    // All found counts are the same (e.g., all 0 or all max)
+                    foundHeight = 0; // Or 100 if all are maxFoundValue
+                } else {
+                    // Scale the transformed found count to the 0-100 range
+                    foundHeight = ((transformedFoundCount - transformedMinFound) / transformedFoundRange) * 100;
+                }
+
+                // Clamp the foundHeight between 0 and 100
+                foundHeight = Math.max(0, Math.min(100, foundHeight)) || 0;
+
                 barFound.style.height = '0%';
-                setTimeout(() => { barFound.style.height = `${foundHeight}%` }, 100);
+                setTimeout(() => { barFound.style.height = `${foundHeight}%`; }, 100 + (i * 20));
 
                 // 3. Create Label
                 const label = document.createElement('div');
